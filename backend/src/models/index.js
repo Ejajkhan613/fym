@@ -1,0 +1,21 @@
+module.exports = {
+    address: require("./address.model"),
+    auditLog: require("./audit-log.model"),
+    cart: require("./cart.model"),
+    customerProfile: require("./customer-profile.model"),
+    delivery: require("./delivery.model"),
+    medicine: require("./medicine.model"),
+    notification: require("./notification.model"),
+    order: require("./order.model"),
+    orderItem: require("./order-item.model"),
+    penalty: require("./penalty.model"),
+    pharmacist: require("./pharmacist.model"),
+    pharmacy: require("./pharmacy.model"),
+    pharmacyDocument: require("./pharmacy-document.model"),
+    pharmacyInventory: require("./pharmacy-inventory.model"),
+    paymentTransaction: require("./payment-transaction.model"),
+    prescription: require("./prescription.model"),
+    supportTicket: require("./support-ticket.model"),
+    user: require("./user.model"),
+    vendorOrderOffer: require("./vendor-order-offer.model")
+};
