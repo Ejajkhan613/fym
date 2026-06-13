@@ -1,0 +1,46 @@
+{
+  "expo": {
+    "name": "Find Your Medicines",
+    "slug": "fym-customer",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.fym.customer",
+      "infoPlist": {
+        "NSCameraUsageDescription": "FYM uses the camera so customers can capture prescription photos.",
+        "NSPhotoLibraryUsageDescription": "FYM uses photo library access so customers can upload existing prescription images."
+      }
+    },
+    "android": {
+      "package": "com.fym.customer",
+      "permissions": [
+        "CAMERA",
+        "READ_MEDIA_IMAGES"
+      ],
+      "adaptiveIcon": {
+        "backgroundColor": "#E6F4FE",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "plugins": [
+      "expo-secure-store",
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "FYM uses the camera so customers can capture prescription photos.",
+          "photosPermission": "FYM uses photo library access so customers can upload prescription images."
+        }
+      ],
+      "expo-document-picker"
+    ],
+    "web": {
+      "favicon": "./assets/favicon.png"
+    }
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "name": "@fym/catalog-service",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Medicine catalog and search service for Find Your Medicines.",
+  "main": "src/app.js",
+  "type": "commonjs",
+  "scripts": {
+    "test": "jest --passWithNoTests"
+  }
+}

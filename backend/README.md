@@ -1,114 +1,109 @@
 # FYM Backend
 
-Express backend for Find Your Medicines.
+Microservice backend workspace for **Find Your Medicines** using Express, PostgreSQL, Redis, and Kafka.
 
-## Setup
+The workspace is organized so each service can evolve independently while sharing common infrastructure packages. The current implemented services cover OTP auth, users/customers, pharmacy onboarding, admin operations, order/vendor workflows, cart, catalog, prescriptions, matching, payments, delivery, notifications, support, penalties, audit/compliance, analytics, and gateway routing.
 
-```bash
-npm install
-cp .env.example .env
-```
-
-On Windows PowerShell, use `copy .env.example .env` if `cp` is not available.
-
-Set `DATABASE_URL` in `.env` to your PostgreSQL database connection string.
-
-## Scripts
-
-```bash
-npm run dev
-npm start
-npm run check
-npm run db:migrate
-```
-
-The initial API prefix is `/api/v1`.
-
-Health endpoints:
+## Layout
 
 ```text
-GET /api/v1/health
-GET /api/v1/health/ready
+backend/
+  services/
+    api-gateway/
+    auth-service/
+    user-service/
+    pharmacy-service/
+    catalog-service/
+    prescription-service/
+    order-service/
+    matching-service/
+    inventory-service/
+    payment-service/
+    delivery-service/
+    notification-service/
+    support-service/
+    penalty-service/
+    admin-service/
+    audit-compliance-service/
+    analytics-service/
+  packages/
+    config/
+    database/
+    cache/
+    messaging/
+    logger/
+    validation/
+    shared-types/
+    errors/
+    security/
+  infra/
+    docker/
+    postgres/
+    redis/
+    kafka/
+    nginx/
+    kubernetes/
+    terraform/
+  docs/
+    architecture/
+    api/
+    compliance/
+    database/
+    events/
+  tests/
+    contract/
+    integration/
+    e2e/
+  scripts/
 ```
 
-`/health/ready` checks PostgreSQL connectivity.
+## Service Boundaries
 
-## Auth OTP Flow
+- `api-gateway`: request routing, auth middleware, rate limiting, API aggregation.
+- `auth-service`: login, sessions, roles, JWT lifecycle.
+- `user-service`: customers, profiles, addresses, family members.
+- `pharmacy-service`: onboarding, licenses, pharmacists, trust score.
+- `catalog-service`: medicines, search, safety rules, substitutions.
+- `prescription-service`: uploads, OCR pipeline, pharmacist review, fraud checks.
+- `order-service`: cart/order lifecycle, state machine, cancellations.
+- `matching-service`: nearby pharmacy selection, dispatch waves, atomic acceptance locks.
+- `inventory-service`: intentionally left as a placeholder for now; stock/inventory APIs are not implemented yet.
+- `payment-service`: authorization, capture, refunds, settlements, ledgers.
+- `delivery-service`: rider assignment, tracking, proof of delivery.
+- `notification-service`: push, SMS, email, WebSocket events.
+- `support-service`: customer support tickets and ticket messages.
+- `penalty-service`: pharmacy penalties, waivers, and appeals.
+- `admin-service`: dashboards, operational controls, review panels.
+- `audit-compliance-service`: audit logs, prescription access logs, regulatory reports.
+- `analytics-service`: business, operations, and compliance metrics.
 
-Request OTP with an explicit purpose:
+## Installed Foundation Packages
 
-```http
-POST /api/v1/auth/otp/request
+- Express HTTP layer: `express`, `cors`, `helmet`, `compression`, `cookie-parser`, `express-rate-limit`
+- PostgreSQL: `pg`, `knex`
+- Redis: `ioredis`, `bullmq`
+- Kafka: `kafkajs`
+- Realtime/events: `socket.io`
+- Auth/security: `jsonwebtoken`, `bcryptjs`
+- Validation/errors: `zod`, `http-errors`
+- Files/object storage: `multer`, `@aws-sdk/client-s3`
+- Observability/docs: `pino`, `pino-http`, `prom-client`, `swagger-ui-express`, `yamljs`
+- Tooling: `jest`, `supertest`, `eslint`, `prettier`, `nodemon`, `cross-env`
+
+## Verification
+
+```bash
+npm run verify
 ```
 
-```json
-{
-  "phone": "9000000000",
-  "otpPurpose": "REGISTER"
-}
-```
+This runs JavaScript syntax checks, Prettier format checks, and the Jest smoke/unit test suite without starting any backend server.
 
-Supported `otpPurpose` values:
-
-- `REGISTER`
-- `LOGIN`
-- `CHANGE_PHONE` reserved for later
-
-Registration verifies with:
-
-```http
-POST /api/v1/auth/otp/verify
-```
-
-Login verifies with:
-
-```http
-POST /api/v1/auth/login
-```
-
-## Database
-
-The first migration creates:
-
-- `users`
-- `pharmacies`
-- `schema_migrations`
-
-The second migration creates the remaining core project tables:
-
-- `customer_profiles`
-- `addresses`
-- `pharmacists`
-- `medicines`
-- `pharmacy_inventory`
-- `prescriptions`
-- `orders`
-- `order_items`
-- `vendor_order_offers`
-- `penalties`
-- `audit_logs`
-
-The third migration creates pharmacy onboarding document storage:
-
-- `pharmacy_documents`
-
-The fourth migration creates operational API storage:
-
-- `cart_items`
-- `support_tickets`
-- `support_ticket_messages`
-- `notifications`
-- `notification_devices`
-- `payment_transactions`
-- `delivery_riders`
-- `delivery_assignments`
-
-The fifth migration removes password-based auth storage:
-
-- drops `users.password_hash`
-
-Run migrations after PostgreSQL is available and `.env` has a valid `DATABASE_URL`:
+## Operations
 
 ```bash
 npm run db:migrate
+npm run db:status
+npm run start:service -- api-gateway
 ```
+
+The service launcher accepts the service key, for example `auth`, `user`, `order`, `payment`, `delivery`, `admin`, or `api-gateway`.

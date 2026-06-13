@@ -1,0 +1,11 @@
+{
+  "name": "@fym/audit-compliance-service",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Audit and compliance service for Find Your Medicines.",
+  "main": "src/app.js",
+  "type": "commonjs",
+  "scripts": {
+    "test": "jest --passWithNoTests"
+  }
+}

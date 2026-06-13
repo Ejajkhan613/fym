@@ -1,0 +1,11 @@
+{
+  "name": "@fym/prescription-service",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Prescription upload, OCR metadata, fraud flag, and pharmacist review service for Find Your Medicines.",
+  "main": "src/app.js",
+  "type": "commonjs",
+  "scripts": {
+    "test": "jest --passWithNoTests"
+  }
+}

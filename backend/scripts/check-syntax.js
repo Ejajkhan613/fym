@@ -1,40 +1,45 @@
+const { readdirSync, statSync } = require("fs");
+const { join } = require("path");
 const { spawnSync } = require("child_process");
-const fs = require("fs");
-const path = require("path");
 
-const sourceDirectory = path.join(__dirname, "..", "src");
+const ROOTS = ["services", "packages"];
+const SKIP_DIRS = new Set(["node_modules", ".git"]);
 
-function collectJavaScriptFiles(directory) {
-    const entries = fs.readdirSync(directory, { withFileTypes: true });
-    const files = [];
+function collectJavaScriptFiles(directory, files = []) {
+  for (const entry of readdirSync(directory)) {
+    const path = join(directory, entry);
+    const stat = statSync(path);
 
-    for (const entry of entries) {
-        const entryPath = path.join(directory, entry.name);
-
-        if (entry.isDirectory()) {
-            files.push(...collectJavaScriptFiles(entryPath));
-            continue;
-        }
-
-        if (entry.isFile() && entry.name.endsWith(".js")) {
-            files.push(entryPath);
-        }
+    if (stat.isDirectory()) {
+      if (!SKIP_DIRS.has(entry)) collectJavaScriptFiles(path, files);
+      continue;
     }
 
-    return files;
+    if (entry.endsWith(".js")) files.push(path);
+  }
+
+  return files;
 }
 
-const files = collectJavaScriptFiles(sourceDirectory).sort();
+const files = ROOTS.flatMap((root) =>
+  collectJavaScriptFiles(join(process.cwd(), root)),
+);
+let failed = false;
 
 for (const file of files) {
-    const result = spawnSync(process.execPath, ["--check", file], {
-        encoding: "utf8"
-    });
+  const result = spawnSync(process.execPath, ["--check", file], {
+    encoding: "utf8",
+    stdio: "pipe",
+  });
 
-    if (result.status !== 0) {
-        process.stderr.write(result.stderr || result.stdout);
-        process.exit(result.status || 1);
-    }
+  if (result.status !== 0) {
+    failed = true;
+    process.stderr.write(result.stderr || result.stdout);
+  }
 }
 
-console.log(`Checked ${files.length} JavaScript files.`);
+if (failed) {
+  process.exit(1);
+}
+
+console.log(`Syntax check passed for ${files.length} JavaScript files.`);

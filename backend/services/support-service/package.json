@@ -1,0 +1,11 @@
+{
+  "name": "@fym/support-service",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Customer support ticket service for Find Your Medicines.",
+  "main": "src/app.js",
+  "type": "commonjs",
+  "scripts": {
+    "test": "jest --passWithNoTests"
+  }
+}

@@ -45,106 +45,8 @@ The app should not behave like “any shop can sell anything.” It should behav
    * Must approve regulated medicine dispensing.
    * Must maintain audit trail.
 
----
 
-# 3. Legal and Compliance Reality
-
-This product must be designed around regulation from day one.
-
-In India, prescription drugs can be supplied only by or under the supervision of a registered pharmacist from licensed premises, and state licensing authorities monitor contraventions under the Drugs and Cosmetics Rules. ([Press Information Bureau][1])
-
-The 2018 draft e-pharmacy rules proposed registration requirements for e-pharmacies and included restrictions around certain categories such as narcotic and psychotropic substances. ([CDSCO][2]) The draft rules are important for design planning, but you should still get current legal advice before launch because online pharmacy regulation in India has been evolving.
-
-The Digital Personal Data Protection framework is also relevant because prescriptions, patient names, phone numbers, addresses, and medicine history are sensitive personal data in practice. The DPDP Rules, 2025 were notified in November 2025 and operationalize the DPDP Act, 2023. ([Press Information Bureau][3])
-
-ABDM is also relevant if you later want consent-based health-record sharing, ABHA integration, or interoperability. ABDM allows citizens to generate ABHA and share health records through consent-based mechanisms. ([abdm.gov.in][4])
-
-## Compliance principle
-
-Do **not** build this as:
-
-> User orders any medicine → shop accepts → delivery happens.
-
-Build it as:
-
-> User requests medicine → system classifies medicine risk → prescription validation happens where needed → licensed pharmacy and registered pharmacist approve → legal invoice generated → delivery with audit trail.
-
----
-
-# 4. Medicine Categories and Order Rules
-
-You need a medicine policy engine.
-
-## Category A: OTC medicines
-
-Examples:
-
-* Paracetamol where allowed OTC
-* ORS
-* Basic antacids
-* Bandages
-* Health devices
-* Some topical products
-
-Flow:
-
-* User can order directly.
-* No prescription required.
-* Pharmacy accepts based on stock.
-* Invoice generated.
-* Delivery begins.
-
-## Category B: Prescription medicines
-
-Examples:
-
-* Antibiotics
-* BP medicines
-* Diabetes medicines
-* Asthma medicines
-* Strong painkillers where prescription is required
-
-Flow:
-
-* Prescription required.
-* OCR can extract medicine names.
-* Pharmacist must verify:
-
-  * Doctor name
-  * Doctor registration number where available
-  * Patient name
-  * Date
-  * Medicine name
-  * Dosage
-  * Quantity
-  * Duration
-* Pharmacy cannot dispense more than prescribed.
-
-The Indian Medical Association’s position also emphasizes that prescription drugs require a doctor’s prescription and the chemist cannot dispense quantity beyond what is prescribed. ([ima-india.org][5])
-
-## Category C: High-risk / controlled / restricted medicines
-
-Examples:
-
-* Schedule X
-* Narcotics
-* Psychotropic substances
-* Habit-forming drugs
-* Some tranquilizers
-* Abuse-prone cough syrups
-* Strong sedatives
-
-Flow:
-
-* Ideally **do not support home delivery in early versions**.
-* Mark as “not serviceable online” or “visit licensed pharmacy with original prescription.”
-* Require manual legal review before supporting.
-
-Telemedicine guidelines also treat Schedule X and narcotic/psychotropic drugs as prohibited for telemedicine prescriptions due to abuse and public harm concerns. ([AIIMS][6])
-
----
-
-# 5. Main User Flows
+# 3. Main User Flows
 
 ## Flow 1: Search-based OTC order
 
@@ -394,7 +296,7 @@ Best long-term model.
 Start with:
 
 ```text
-Manual confirmation + high penalty for wrong acceptance + pharmacy trust scoring
+Manual confirmation + medium penalty for wrong acceptance (like 5 rupees) + pharmacy trust scoring
 ```
 
 Then add:
@@ -520,8 +422,6 @@ Dolo 650 Tablet
 Salt: Paracetamol 650mg
 Pack: 15 tablets
 Prescription: Not required / depends on policy
-Nearby availability: 6 pharmacies
-Estimated delivery: 18–28 min
 ```
 
 ---
@@ -2331,137 +2231,3 @@ medicine-platform/
     compliance/
     architecture/
 ```
-
----
-
-# 41. Initial Feature Priority
-
-## Must-have for first serious launch
-
-```text
-customer login
-location
-medicine search
-prescription upload
-order request
-nearby pharmacy matching
-vendor accept/reject
-atomic order lock
-payment
-basic delivery tracking
-admin pharmacy approval
-admin order management
-penalty engine v1
-audit logs
-```
-
-## Should-have
-
-```text
-OCR
-inventory upload
-pharmacist approval queue
-substitution flow
-vendor trust score
-refund automation
-support chat
-```
-
-## Later
-
-```text
-ABDM
-AI fraud detection
-medicine interaction warning
-subscription refills
-advanced delivery optimization
-POS integrations
-```
-
----
-
-# 42. Biggest Strategic Advice
-
-Do not compete only on “fast delivery.”
-
-Compete on:
-
-```text
-fast delivery
-verified pharmacies
-legal dispensing
-prescription safety
-authentic medicines
-transparent invoice
-pharmacist-backed fulfillment
-high availability
-trust
-```
-
-A normal quick-commerce company can deliver chips in 10 minutes. Medicine delivery requires **trust, compliance, accuracy, and accountability**.
-
-Your strongest positioning can be:
-
-> “Fast medicine delivery from verified nearby pharmacies, with prescription-safe fulfillment and pharmacist verification.”
-
----
-
-# 43. Best Practical Launch Model
-
-Start with a controlled version:
-
-```text
-City: 1 city
-Radius: 3–5 km zones
-Vendors: 30–50 verified pharmacies
-Medicine types: OTC + normal prescription medicines
-Restricted drugs: blocked
-Delivery: hybrid
-Inventory: manual confirmation
-Prescription: upload + pharmacist verification
-Penalty: active from day one
-Admin audit: active from day one
-```
-
-Then scale only after your fulfillment rate is strong.
-
-Target early KPIs:
-
-```text
-Vendor acceptance rate: > 70%
-Wrong acceptance rate: < 5%
-Average delivery time: < 45 minutes
-Prescription rejection clarity: 100%
-Order cancellation rate: < 8%
-Customer repeat rate: > 30%
-Vendor SLA compliance: > 85%
-```
-
----
-
-# 44. Final Build Philosophy
-
-This should not be a simple marketplace. Build it as a **regulated hyperlocal medicine fulfillment network**.
-
-The winning architecture is:
-
-```text
-Medicine catalog intelligence
-+ Prescription verification
-+ Licensed pharmacy network
-+ Real-time vendor matching
-+ Atomic order locking
-+ Trust-score-based dispatch
-+ Penalty-backed accountability
-+ Compliance-first admin system
-+ Fast delivery layer
-```
-
-That is the difference between a small app and a platform that can scale like a serious company.
-
-[1]: https://www.pib.gov.in/newsite/PrintRelease.aspx?relid=137446&utm_source=chatgpt.com "Online Sale of Medicines"
-[2]: https://cdsco.gov.in/opencms/resources/UploadCDSCOWeb/2018/UploadGazette_NotificationsFiles/2018.08.28_Draft%20GSR%20817%28E%29_Sale%20of%20Drugs%20by%20E-Pharmacy.pdf?utm_source=chatgpt.com "jftLVªh laö Mhö ,yö&33004@99 vlk/kj.k Hkkx II—[k.M 3— ..."
-[3]: https://www.pib.gov.in/PressReleasePage.aspx?PRID=2190655&utm_source=chatgpt.com "DPDP Rules, 2025 Notified"
-[4]: https://abdm.gov.in/?utm_source=chatgpt.com "NHA | Official website Ayushman Bharat Digital Mission"
-[5]: https://www.ima-india.org/ima/left-side-bar.php?pid=324&utm_source=chatgpt.com "IMA White Paper on Online Pharmacy"
-[6]: https://www.aiims.edu/images/pdf/notice/Telemedicine_GOI.pdf?utm_source=chatgpt.com "Telemedicine Practice Guidelines"

@@ -1,0 +1,8 @@
+{
+  "name": "@fym/database",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Database migration utilities for Find Your Medicines backend.",
+  "main": "src/index.js",
+  "type": "commonjs"
+}
