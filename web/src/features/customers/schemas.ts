@@ -13,9 +13,6 @@ export const customerProfileFormSchema = z.object({
   gender: z
     .enum(["male", "female", "other", "prefer_not_to_say"])
     .optional(),
-  emergencyContactName: optionalText(120),
-  emergencyContactPhone: optionalText(20),
-  abhaIdOptional: optionalText(80),
 });
 
 export const customerAddressFormSchema = z.object({

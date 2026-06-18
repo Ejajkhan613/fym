@@ -1,0 +1,22 @@
+{
+  "expo": {
+    "name": "FYM Pharmacy",
+    "slug": "fym-pharmacy",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "scheme": "fympharmacy",
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.fym.pharmacy"
+    },
+    "android": {
+      "package": "com.fym.pharmacy",
+      "adaptiveIcon": {
+        "backgroundColor": "#F3F7FF"
+      }
+    },
+    "plugins": ["expo-secure-store"]
+  }
+}

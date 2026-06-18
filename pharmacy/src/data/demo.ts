@@ -1,0 +1,40 @@
+import type { InventoryItem } from '../types/domain';
+
+export const initialInventory: InventoryItem[] = [
+  {
+    id: 'inventory-dolo-650',
+    medicineName: 'Dolo 650 Tablet',
+    genericName: 'Paracetamol',
+    strength: '650mg',
+    quantity: 42,
+    batchNumber: 'DL650-A24',
+    expiryDate: '2027-04-30',
+    price: 34,
+    coldChainRequired: false,
+    fastMoving: true,
+  },
+  {
+    id: 'inventory-amox-500',
+    medicineName: 'Amoxicillin 500mg',
+    genericName: 'Amoxicillin',
+    strength: '500mg',
+    quantity: 8,
+    batchNumber: 'AMX500-K25',
+    expiryDate: '2026-09-15',
+    price: 78,
+    coldChainRequired: false,
+    fastMoving: true,
+  },
+  {
+    id: 'inventory-insulin',
+    medicineName: 'Insulin Glargine Pen',
+    genericName: 'Insulin glargine',
+    strength: '100 IU/ml',
+    quantity: 5,
+    batchNumber: 'IGL100-COLD',
+    expiryDate: '2026-08-30',
+    price: 612,
+    coldChainRequired: true,
+    fastMoving: false,
+  },
+];

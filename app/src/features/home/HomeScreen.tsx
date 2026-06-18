@@ -1,5 +1,6 @@
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import {
+  ArrowRight,
   Bell,
   ChevronDown,
   Clock,
@@ -8,14 +9,19 @@ import {
   Pill,
   RefreshCcw,
   Search,
+  ShieldCheck,
+  Truck,
 } from 'lucide-react-native';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/metrics';
-import type { AuthSession, CartEntry } from '../../types/domain';
+import type { AuthSession, CartEntry, CustomerAddress } from '../../types/domain';
 import { quickReorders } from '../../data/demo';
+import { formatAddress, formatShortAddress } from '../../utils/addresses';
 
 type HomeScreenProps = {
   session: AuthSession;
+  deliveryAddress?: CustomerAddress;
+  onChangeAddress: () => void;
   onOpenPrescription: () => void;
   onOpenSearch: () => void;
   onAddToCart: (item: CartEntry) => void;
@@ -23,11 +29,18 @@ type HomeScreenProps = {
 
 export function HomeScreen({
   session,
+  deliveryAddress,
+  onChangeAddress,
   onOpenPrescription,
   onOpenSearch,
   onAddToCart,
 }: HomeScreenProps) {
-  const firstName = session.user.name?.split(' ')[0] || 'Aarav';
+  const firstName = session.user.name?.split(' ')[0] || 'Customer';
+  const greeting = getGreeting();
+  const addressTitle = deliveryAddress ? formatShortAddress(deliveryAddress) : 'Choose delivery address';
+  const addressText = deliveryAddress
+    ? formatAddress(deliveryAddress)
+    : 'Add an address for pharmacy matching';
 
   return (
     <ScrollView
@@ -37,113 +50,182 @@ export function HomeScreen({
     >
       <View style={styles.hero}>
         <View style={styles.heroTop}>
-          <View>
-            <Text style={styles.eyebrow}>GOOD MORNING</Text>
+          <View style={styles.heroCopy}>
+            <Text style={styles.eyebrow}>{greeting.label.toUpperCase()}</Text>
             <Text style={styles.greeting}>Hi, {firstName}</Text>
-            <View style={styles.locationRow}>
-              <LocateFixed color="#D7E7FF" size={19} strokeWidth={2.2} />
-              <Text style={styles.location}>Koramangala, Bengaluru</Text>
-              <ChevronDown color="#D7E7FF" size={18} strokeWidth={2.2} />
-            </View>
+            <Text style={styles.heroSubtext}>{greeting.message}</Text>
           </View>
           <View style={styles.bellWrap}>
-            <Bell color="#FFFFFF" size={30} strokeWidth={2.2} />
+            <Bell color="#FFFFFF" size={28} strokeWidth={2.2} />
             <View style={styles.notificationDot} />
           </View>
         </View>
 
         <Pressable
           accessibilityRole="button"
-          onPress={onOpenSearch}
-          style={styles.searchBox}
+          onPress={onChangeAddress}
+          style={styles.locationCard}
         >
-          <Search color={colors.muted} size={28} strokeWidth={2.2} />
-          <Text style={styles.searchPlaceholder}>Search medicines & products...</Text>
+          <View style={styles.locationIcon}>
+            <LocateFixed color="#FFFFFF" size={21} strokeWidth={2.4} />
+          </View>
+          <View style={styles.locationCopy}>
+            <Text style={styles.locationLabel}>Deliver to</Text>
+            <Text numberOfLines={1} style={styles.locationTitle}>
+              {addressTitle}
+            </Text>
+            <Text numberOfLines={1} style={styles.locationText}>
+              {addressText}
+            </Text>
+          </View>
+          <ChevronDown color="#D7E7FF" size={20} strokeWidth={2.3} />
+        </Pressable>
+
+        <Pressable accessibilityRole="search" onPress={onOpenSearch} style={styles.searchBox}>
+          <Search color={colors.primary} size={25} strokeWidth={2.4} />
+          <View style={styles.searchCopy}>
+            <Text style={styles.searchPlaceholder}>Search medicines, brands, salts</Text>
+            <Text style={styles.searchHint}>Find availability near your selected address</Text>
+          </View>
         </Pressable>
       </View>
 
       <View style={styles.body}>
         <View style={styles.actionGrid}>
-          <Pressable
+          <ActionCard
+            title="Upload prescription"
+            body="Share a prescription and let pharmacies quote the exact medicines."
+            cta="Upload now"
+            tone="primary"
+            Icon={FileUp}
             onPress={onOpenPrescription}
-            style={[styles.actionCard, styles.primaryActionCard]}
-          >
-            <View style={styles.actionIconPrimary}>
-              <FileUp color="#FFFFFF" size={30} strokeWidth={2.2} />
-            </View>
-            <Text style={styles.primaryActionTitle}>Upload Prescription</Text>
-            <Text style={styles.primaryActionBody}>Upload and get medicines delivered fast</Text>
-            <Text style={styles.primaryActionLink}>{'Upload now ->'}</Text>
-            <View style={[styles.bubble, styles.bubbleTop]} />
-            <View style={[styles.bubble, styles.bubbleBottom]} />
-          </Pressable>
-
-          <Pressable
+          />
+          <ActionCard
+            title="Search medicines"
+            body="Search OTC and prescribed items by brand, salt, or strength."
+            cta="Browse catalog"
+            tone="light"
+            Icon={Pill}
             onPress={onOpenSearch}
-            style={[styles.actionCard, styles.secondaryActionCard]}
-          >
-            <View style={styles.actionIconSecondary}>
-              <Pill color={colors.primary} size={31} strokeWidth={2.3} />
-            </View>
-            <Text style={styles.secondaryActionTitle}>Search Medicines</Text>
-            <Text style={styles.secondaryActionBody}>Find OTC meds from nearby pharmacies</Text>
-            <Text style={styles.secondaryActionLink}>{'Browse now ->'}</Text>
-            <View style={[styles.secondaryBubble, styles.secondaryBubbleTop]} />
-            <View style={[styles.secondaryBubble, styles.secondaryBubbleBottom]} />
-          </Pressable>
-        </View>
-
-        <View style={styles.offerCard}>
-          <Text style={styles.offerEyebrow}>LIMITED OFFER</Text>
-          <Text style={styles.offerTitle}>20% off on all vitamins & supplements</Text>
-          <Pressable style={styles.offerButton}>
-            <Text style={styles.offerButtonText}>Shop Now</Text>
-          </Pressable>
+          />
         </View>
 
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Quick Reorder</Text>
-          <Pressable>
-            <Text style={styles.seeAll}>See all</Text>
-          </Pressable>
+          <View>
+            <Text style={styles.sectionTitle}>Quick reorder</Text>
+            <Text style={styles.sectionSubtitle}>Repeat common medicines in one tap</Text>
+          </View>
         </View>
 
         <View style={styles.reorderList}>
           {quickReorders.map((item, index) => (
-            <View
-              key={item.id}
-              style={styles.reorderCard}
-            >
+            <View key={item.id} style={styles.reorderCard}>
               <View style={[styles.reorderIcon, index === 1 ? styles.reorderIconTeal : null]}>
                 <Pill
                   color={index === 1 ? colors.teal : colors.primary}
-                  size={38}
+                  size={30}
                   strokeWidth={2.4}
                 />
               </View>
               <View style={styles.reorderCopy}>
-                <Text style={styles.reorderName}>{item.name}</Text>
-                <Text style={styles.reorderPack}>{item.pack} · Rs {item.price}</Text>
+                <Text numberOfLines={1} style={styles.reorderName}>
+                  {item.name}
+                </Text>
+                <Text style={styles.reorderPack}>{item.pack}</Text>
                 <View style={styles.reorderMeta}>
-                  <Clock color={colors.muted} size={17} strokeWidth={2.1} />
+                  <Clock color={colors.muted} size={15} strokeWidth={2.2} />
                   <Text style={styles.reorderTime}>
                     Last ordered {index === 0 ? '3 days ago' : '1 week ago'}
                   </Text>
                 </View>
               </View>
-              <Pressable
-                onPress={() => onAddToCart(item)}
-                style={styles.reorderButton}
-              >
-                <RefreshCcw color={colors.primary} size={18} strokeWidth={2.2} />
-                <Text style={styles.reorderButtonText}>Reorder</Text>
-              </Pressable>
+              <View style={styles.reorderRight}>
+                <Text style={styles.reorderPrice}>Rs {item.price}</Text>
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() => onAddToCart(item)}
+                  style={styles.reorderButton}
+                >
+                  <RefreshCcw color={colors.primary} size={16} strokeWidth={2.4} />
+                  <Text style={styles.reorderButtonText}>Reorder</Text>
+                </Pressable>
+              </View>
             </View>
           ))}
         </View>
       </View>
     </ScrollView>
   );
+}
+
+function ActionCard({
+  title,
+  body,
+  cta,
+  tone,
+  Icon,
+  onPress,
+}: {
+  title: string;
+  body: string;
+  cta: string;
+  tone: 'primary' | 'light';
+  Icon: typeof FileUp;
+  onPress: () => void;
+}) {
+  const isPrimary = tone === 'primary';
+
+  return (
+    <Pressable
+      accessibilityRole="button"
+      onPress={onPress}
+      style={[styles.actionCard, isPrimary ? styles.primaryActionCard : styles.lightActionCard]}
+    >
+      <View style={[styles.actionIcon, isPrimary ? styles.actionIconPrimary : styles.actionIconLight]}>
+        <Icon color={isPrimary ? '#FFFFFF' : colors.primary} size={27} strokeWidth={2.4} />
+      </View>
+      <Text style={[styles.actionTitle, isPrimary ? styles.actionTitlePrimary : null]}>{title}</Text>
+      <Text style={[styles.actionBody, isPrimary ? styles.actionBodyPrimary : null]}>{body}</Text>
+      <View style={styles.actionCtaRow}>
+        <Text style={[styles.actionCta, isPrimary ? styles.actionCtaPrimary : null]}>{cta}</Text>
+        <ArrowRight
+          color={isPrimary ? '#FFFFFF' : colors.primary}
+          size={17}
+          strokeWidth={2.5}
+        />
+      </View>
+    </Pressable>
+  );
+}
+
+function getGreeting(date = new Date()) {
+  const hour = date.getHours();
+
+  if (hour < 12) {
+    return {
+      label: 'Good morning',
+      message: 'Start your day with on-time refills.',
+    };
+  }
+
+  if (hour < 17) {
+    return {
+      label: 'Good afternoon',
+      message: 'Find medicines from pharmacies near you.',
+    };
+  }
+
+  if (hour < 21) {
+    return {
+      label: 'Good evening',
+      message: 'Order essentials before the day wraps up.',
+    };
+  }
+
+  return {
+    label: 'Good night',
+    message: 'Late orders can still be matched where available.',
+  };
 }
 
 const styles = StyleSheet.create({
@@ -157,223 +239,237 @@ const styles = StyleSheet.create({
   hero: {
     backgroundColor: colors.primary,
     paddingHorizontal: spacing.screen,
-    paddingTop: 42,
-    paddingBottom: 32,
+    paddingTop: 38,
+    paddingBottom: 26,
   },
   heroTop: {
     flexDirection: 'row',
+    alignItems: 'flex-start',
     justifyContent: 'space-between',
-    gap: 20,
+    gap: 18,
+  },
+  heroCopy: {
+    flex: 1,
   },
   eyebrow: {
     color: '#C9DEFF',
-    fontSize: 16,
+    fontSize: 13,
     letterSpacing: 0,
-    fontWeight: '700',
-  },
-  greeting: {
-    marginTop: 10,
-    color: '#FFFFFF',
-    fontSize: 31,
-    lineHeight: 36,
     fontWeight: '900',
   },
-  locationRow: {
-    marginTop: 14,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 7,
+  greeting: {
+    marginTop: 7,
+    color: '#FFFFFF',
+    fontSize: 31,
+    lineHeight: 37,
+    fontWeight: '900',
   },
-  location: {
-    color: '#D7E7FF',
-    fontSize: 18,
+  heroSubtext: {
+    marginTop: 6,
+    color: '#D9E8FF',
+    fontSize: 15,
+    lineHeight: 21,
     fontWeight: '700',
   },
   bellWrap: {
-    width: 66,
-    height: 66,
-    borderRadius: 33,
+    width: 58,
+    height: 58,
+    borderRadius: 22,
     backgroundColor: 'rgba(255,255,255,0.17)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   notificationDot: {
     position: 'absolute',
-    right: 12,
-    top: 10,
+    right: 10,
+    top: 9,
     width: 10,
     height: 10,
     borderRadius: 5,
     backgroundColor: '#FF3D18',
   },
-  searchBox: {
-    minHeight: 68,
-    borderRadius: 22,
-    backgroundColor: '#FFFFFF',
-    marginTop: 30,
-    paddingHorizontal: 20,
+  locationCard: {
+    marginTop: 22,
+    minHeight: 78,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.13)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.18)',
+    paddingHorizontal: 14,
+    paddingVertical: 13,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 14,
+    gap: 12,
+  },
+  locationIcon: {
+    width: 45,
+    height: 45,
+    borderRadius: 15,
+    backgroundColor: 'rgba(255,255,255,0.16)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  locationCopy: {
+    flex: 1,
+    gap: 2,
+  },
+  locationLabel: {
+    color: '#BFD8FF',
+    fontSize: 12,
+    fontWeight: '900',
+  },
+  locationTitle: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '900',
+  },
+  locationText: {
+    color: '#D7E7FF',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  searchBox: {
+    minHeight: 68,
+    borderRadius: 20,
+    backgroundColor: '#FFFFFF',
+    marginTop: 18,
+    paddingHorizontal: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 13,
     shadowColor: colors.shadow,
     shadowOpacity: 0.12,
     shadowRadius: 14,
     shadowOffset: { width: 0, height: 8 },
     elevation: 5,
   },
+  searchCopy: {
+    flex: 1,
+    gap: 2,
+  },
   searchPlaceholder: {
-    color: '#8B8D95',
-    fontSize: 20,
-    fontWeight: '500',
+    color: colors.text,
+    fontSize: 17,
+    fontWeight: '900',
+  },
+  searchHint: {
+    color: colors.muted,
+    fontSize: 13,
+    fontWeight: '600',
   },
   body: {
     paddingHorizontal: spacing.screen,
-    paddingTop: 32,
-    gap: 24,
+    paddingTop: 24,
+    gap: 22,
   },
   actionGrid: {
     flexDirection: 'row',
-    gap: 18,
+    gap: 14,
   },
   actionCard: {
     flex: 1,
-    minHeight: 218,
-    borderRadius: 22,
-    padding: 22,
-    overflow: 'hidden',
+    minHeight: 206,
+    borderRadius: 20,
+    padding: 16,
+    borderWidth: 1,
     shadowColor: colors.shadow,
-    shadowOpacity: 0.15,
-    shadowRadius: 11,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 5,
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 3,
   },
   primaryActionCard: {
-    backgroundColor: colors.primary,
+    backgroundColor: colors.primaryDark,
+    borderColor: colors.primaryDark,
   },
-  secondaryActionCard: {
+  lightActionCard: {
     backgroundColor: '#FFFFFF',
-    borderWidth: 1,
     borderColor: colors.border,
   },
+  actionIcon: {
+    width: 54,
+    height: 54,
+    borderRadius: 17,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 18,
+  },
   actionIconPrimary: {
-    width: 64,
-    height: 64,
-    borderRadius: 18,
-    backgroundColor: 'rgba(255,255,255,0.18)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 24,
+    backgroundColor: 'rgba(255,255,255,0.17)',
   },
-  actionIconSecondary: {
-    width: 64,
-    height: 64,
-    borderRadius: 18,
+  actionIconLight: {
     backgroundColor: colors.primarySoft,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 24,
   },
-  primaryActionTitle: {
-    color: '#FFFFFF',
-    fontSize: 21,
-    lineHeight: 27,
-    fontWeight: '900',
-  },
-  primaryActionBody: {
-    marginTop: 10,
-    color: '#D9E8FF',
-    fontSize: 17,
-    lineHeight: 24,
-    fontWeight: '600',
-  },
-  primaryActionLink: {
-    marginTop: 'auto',
-    color: '#FFFFFF',
-    fontSize: 17,
-    fontWeight: '900',
-  },
-  secondaryActionTitle: {
+  actionTitle: {
     color: colors.text,
-    fontSize: 21,
-    lineHeight: 27,
+    fontSize: 18,
+    lineHeight: 23,
     fontWeight: '900',
   },
-  secondaryActionBody: {
-    marginTop: 10,
-    color: colors.muted,
-    fontSize: 17,
-    lineHeight: 24,
-    fontWeight: '600',
-  },
-  secondaryActionLink: {
-    marginTop: 'auto',
-    color: colors.primary,
-    fontSize: 17,
-    fontWeight: '900',
-  },
-  bubble: {
-    position: 'absolute',
-    borderRadius: 999,
-    backgroundColor: 'rgba(255,255,255,0.12)',
-  },
-  bubbleTop: {
-    width: 95,
-    height: 95,
-    right: -24,
-    top: -22,
-  },
-  bubbleBottom: {
-    width: 128,
-    height: 128,
-    right: -40,
-    bottom: -46,
-  },
-  secondaryBubble: {
-    position: 'absolute',
-    borderRadius: 999,
-    backgroundColor: colors.primarySofter,
-  },
-  secondaryBubbleTop: {
-    width: 88,
-    height: 88,
-    right: -26,
-    top: -24,
-  },
-  secondaryBubbleBottom: {
-    width: 132,
-    height: 132,
-    right: -46,
-    bottom: -44,
-  },
-  offerCard: {
-    borderRadius: 22,
-    backgroundColor: colors.primaryDark,
-    padding: 22,
-    overflow: 'hidden',
-  },
-  offerEyebrow: {
-    color: '#BFD8FF',
-    fontSize: 16,
-    fontWeight: '800',
-  },
-  offerTitle: {
-    marginTop: 8,
+  actionTitlePrimary: {
     color: '#FFFFFF',
-    fontSize: 22,
-    lineHeight: 30,
+  },
+  actionBody: {
+    marginTop: 8,
+    color: colors.muted,
+    fontSize: 13,
+    lineHeight: 19,
+    fontWeight: '700',
+  },
+  actionBodyPrimary: {
+    color: '#D9E8FF',
+  },
+  actionCtaRow: {
+    marginTop: 'auto',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  actionCta: {
+    color: colors.primary,
+    fontSize: 14,
     fontWeight: '900',
   },
-  offerButton: {
-    marginTop: 22,
-    minHeight: 46,
-    borderRadius: 23,
-    backgroundColor: '#EAF3FF',
+  actionCtaPrimary: {
+    color: '#FFFFFF',
+  },
+  promiseRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  promiseItem: {
+    flex: 1,
+    minHeight: 70,
+    borderRadius: 18,
+    backgroundColor: colors.primarySofter,
+    borderWidth: 1,
+    borderColor: '#D7E6FF',
+    padding: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  promiseIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  offerButtonText: {
-    color: colors.primary,
-    fontSize: 18,
+  promiseIconTeal: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  promiseText: {
+    flex: 1,
+    color: colors.text,
+    fontSize: 13,
+    lineHeight: 18,
     fontWeight: '900',
   },
   sectionHeader: {
@@ -383,36 +479,37 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     color: colors.text,
-    fontSize: 25,
+    fontSize: 23,
     fontWeight: '900',
   },
-  seeAll: {
-    color: colors.primary,
-    fontSize: 17,
-    fontWeight: '800',
+  sectionSubtitle: {
+    marginTop: 3,
+    color: colors.muted,
+    fontSize: 14,
+    fontWeight: '700',
   },
   reorderList: {
-    gap: 14,
+    gap: 12,
   },
   reorderCard: {
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: 20,
     backgroundColor: '#FFFFFF',
-    padding: 18,
+    padding: 15,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 14,
+    gap: 13,
     shadowColor: colors.shadow,
-    shadowOpacity: 0.1,
-    shadowRadius: 9,
+    shadowOpacity: 0.07,
+    shadowRadius: 8,
     shadowOffset: { width: 0, height: 4 },
-    elevation: 3,
+    elevation: 2,
   },
   reorderIcon: {
-    width: 66,
-    height: 66,
-    borderRadius: 16,
+    width: 56,
+    height: 56,
+    borderRadius: 17,
     backgroundColor: colors.primarySoft,
     alignItems: 'center',
     justifyContent: 'center',
@@ -426,13 +523,13 @@ const styles = StyleSheet.create({
   },
   reorderName: {
     color: colors.text,
-    fontSize: 20,
+    fontSize: 17,
     fontWeight: '900',
   },
   reorderPack: {
     color: colors.muted,
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: 13,
+    fontWeight: '700',
   },
   reorderMeta: {
     flexDirection: 'row',
@@ -441,21 +538,30 @@ const styles = StyleSheet.create({
   },
   reorderTime: {
     color: colors.muted,
-    fontSize: 15,
-    fontWeight: '600',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  reorderRight: {
+    alignItems: 'flex-end',
+    gap: 10,
+  },
+  reorderPrice: {
+    color: colors.text,
+    fontSize: 16,
+    fontWeight: '900',
   },
   reorderButton: {
-    borderRadius: 15,
+    borderRadius: 999,
     backgroundColor: colors.primarySoft,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+    paddingHorizontal: 11,
+    paddingVertical: 8,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 7,
+    gap: 6,
   },
   reorderButtonText: {
     color: colors.primary,
-    fontSize: 15,
+    fontSize: 13,
     fontWeight: '900',
   },
 });

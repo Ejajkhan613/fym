@@ -133,6 +133,40 @@ describe("service route smoke tests", () => {
           isDefault: true,
         })),
         deleteAddress: jest.fn(async () => null),
+        listFamilyProfiles: jest.fn(async () => []),
+        createFamilyProfile: jest.fn(async (userId, payload) => ({
+          id: secondId,
+          userId,
+          ...payload,
+        })),
+        updateFamilyProfile: jest.fn(async (userId, profileId, payload) => ({
+          id: profileId,
+          userId,
+          ...payload,
+        })),
+        deleteFamilyProfile: jest.fn(async () => null),
+        listMedicineReminders: jest.fn(async () => []),
+        createMedicineReminder: jest.fn(async (userId, payload) => ({
+          id: secondId,
+          userId,
+          ...payload,
+        })),
+        updateMedicineReminder: jest.fn(
+          async (userId, reminderId, payload) => ({
+            id: reminderId,
+            userId,
+            ...payload,
+          }),
+        ),
+        deleteMedicineReminder: jest.fn(async () => null),
+        getPrivacySettings: jest.fn(async (userId) => ({
+          userId,
+          pushNotificationsEnabled: true,
+        })),
+        updatePrivacySettings: jest.fn(async (userId, payload) => ({
+          userId,
+          ...payload,
+        })),
       },
     });
 
@@ -153,6 +187,40 @@ describe("service route smoke tests", () => {
         pincode: "781001",
       })
       .expect(201);
+    await request(app)
+      .post(`/customers/${id}/family-profiles`)
+      .send({ fullName: "Parent", relationship: "Mother" })
+      .expect(201);
+    await request(app).get(`/customers/${id}/family-profiles`).expect(200);
+    await request(app)
+      .patch(`/customers/${id}/family-profiles/${secondId}`)
+      .send({ relationship: "Father" })
+      .expect(200);
+    await request(app)
+      .delete(`/customers/${id}/family-profiles/${secondId}`)
+      .expect(204);
+    await request(app)
+      .post(`/customers/${id}/medicine-reminders`)
+      .send({
+        medicineName: "Dolo 650",
+        frequency: "Daily",
+        scheduleTime: "09:00",
+        startDate: "2026-06-13",
+      })
+      .expect(201);
+    await request(app).get(`/customers/${id}/medicine-reminders`).expect(200);
+    await request(app)
+      .patch(`/customers/${id}/medicine-reminders/${secondId}`)
+      .send({ isActive: false })
+      .expect(200);
+    await request(app)
+      .delete(`/customers/${id}/medicine-reminders/${secondId}`)
+      .expect(204);
+    await request(app).get(`/customers/${id}/privacy-settings`).expect(200);
+    await request(app)
+      .put(`/customers/${id}/privacy-settings`)
+      .send({ promotionalOffersEnabled: true })
+      .expect(200);
   });
 
   test("pharmacy onboarding routes validate and delegate", async () => {
@@ -206,6 +274,41 @@ describe("service route smoke tests", () => {
           status: "BLACKLISTED",
         })),
       },
+      inventoryService: {
+        listInventory: jest.fn(async () => ({ items: [], total: 0 })),
+        createInventoryItem: jest.fn(async (pharmacyId, payload) => ({
+          id: secondId,
+          pharmacyId,
+          ...payload,
+        })),
+        updateInventoryItem: jest.fn(
+          async (pharmacyId, inventoryId, payload) => ({
+            id: inventoryId,
+            pharmacyId,
+            ...payload,
+          }),
+        ),
+        adjustInventoryQuantity: jest.fn(
+          async (pharmacyId, inventoryId, payload) => ({
+            id: inventoryId,
+            pharmacyId,
+            quantityDelta: payload.quantityDelta,
+          }),
+        ),
+        bulkUploadInventory: jest.fn(async (pharmacyId, payload) =>
+          payload.items.map((item, index) => ({
+            id: index === 0 ? id : secondId,
+            pharmacyId,
+            ...item,
+          })),
+        ),
+        reportStockMismatch: jest.fn(async (pharmacyId, payload) => ({
+          id: secondId,
+          pharmacyId,
+          status: "OPEN",
+          ...payload,
+        })),
+      },
     });
 
     await request(app)
@@ -218,6 +321,49 @@ describe("service route smoke tests", () => {
         city: "Guwahati",
         state: "Assam",
         pincode: "781001",
+      })
+      .expect(201);
+    await request(app).get(`/pharmacies/${id}/inventory`).expect(200);
+    await request(app)
+      .post(`/pharmacies/${id}/inventory`)
+      .send({
+        medicineName: "Dolo 650 Tablet",
+        genericName: "Paracetamol",
+        strength: "650mg",
+        quantity: 25,
+        batchNumber: "DOL-24",
+        expiryDate: "2027-01-31",
+        price: 34,
+        fastMoving: true,
+      })
+      .expect(201);
+    await request(app)
+      .patch(`/pharmacies/${id}/inventory/${secondId}`)
+      .send({ quantity: 20, stockConfidenceScore: 75 })
+      .expect(200);
+    await request(app)
+      .post(`/pharmacies/${id}/inventory/${secondId}/adjust`)
+      .send({ quantityDelta: -1 })
+      .expect(200);
+    await request(app)
+      .post(`/pharmacies/${id}/inventory/bulk-upload`)
+      .send({
+        items: [
+          {
+            medicineName: "Cetirizine Tablet",
+            quantity: 15,
+            price: 18,
+          },
+        ],
+      })
+      .expect(201);
+    await request(app)
+      .post(`/pharmacies/${id}/inventory/${secondId}/mismatch-reports`)
+      .send({
+        medicineName: "Dolo 650 Tablet",
+        expectedQuantity: 20,
+        actualQuantity: 18,
+        reason: "shelf_count_mismatch",
       })
       .expect(201);
   });
@@ -305,6 +451,23 @@ describe("service route smoke tests", () => {
         markPacked: jest.fn(async (orderId) => ({ id: orderId })),
         cancelByPharmacy: jest.fn(async (orderId) => ({ id: orderId })),
       },
+      orderModel: {
+        listRealtimeEvents: jest.fn(async () => ({
+          events: [
+            {
+              id,
+              aggregateType: "order",
+              aggregateId: id,
+              eventName: "OrderCreated",
+              channel: `customer:${id}`,
+              payload: { order: { id } },
+              publishedAt: null,
+              createdAt: new Date().toISOString(),
+            },
+          ],
+          total: 1,
+        })),
+      },
     });
     await request(orderApp)
       .post("/cart/items")
@@ -315,6 +478,12 @@ describe("service route smoke tests", () => {
         unitPrice: 30,
       })
       .expect(201);
+    await request(orderApp)
+      .get(`/realtime/events?channel=customer:${id}`)
+      .expect(200);
+    await request(orderApp)
+      .get("/realtime/events?channel=customer:not-a-uuid")
+      .expect(400);
 
     const matchingApp = createMatchingServiceApp({
       matchingService: {
@@ -336,6 +505,7 @@ describe("service route smoke tests", () => {
       paymentService: {
         initiate: jest.fn(async (payload) => ({ id, ...payload })),
         listForOrder: jest.fn(async () => []),
+        listForCustomer: jest.fn(async () => ({ payments: [], refunds: [] })),
         get: jest.fn(async (paymentId) => ({ id: paymentId })),
         authorize: jest.fn(async (paymentId) => ({ id: paymentId })),
         capture: jest.fn(async (paymentId) => ({ id: paymentId })),
@@ -357,6 +527,7 @@ describe("service route smoke tests", () => {
         amount: 100,
       })
       .expect(201);
+    await request(paymentApp).get(`/payments/customer/${secondId}`).expect(200);
 
     const deliveryApp = createDeliveryServiceApp({
       deliveryService: {

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthScreens } from './src/features/auth/AuthScreens';
 import { MainShell } from './src/navigation/MainShell';
 import { colors } from './src/theme/colors';
@@ -48,24 +49,32 @@ export default function App() {
 
   if (isBooting) {
     return (
-      <View style={styles.loading}>
-        <StatusBar style="dark" />
-        <ActivityIndicator color={colors.primary} />
-        <Text style={styles.loadingText}>Loading FYM</Text>
-      </View>
+      <SafeAreaProvider>
+        <View style={styles.loading}>
+          <StatusBar style="dark" />
+          <ActivityIndicator color={colors.primary} />
+          <Text style={styles.loadingText}>Loading FYM</Text>
+        </View>
+      </SafeAreaProvider>
     );
   }
 
   if (!session) {
-    return <AuthScreens onAuthenticated={handleAuthenticated} />;
+    return (
+      <SafeAreaProvider>
+        <AuthScreens onAuthenticated={handleAuthenticated} />
+      </SafeAreaProvider>
+    );
   }
 
   return (
-    <MainShell
-      session={session}
-      onSessionChange={handleSessionChanged}
-      onLogout={handleLogout}
-    />
+    <SafeAreaProvider>
+      <MainShell
+        session={session}
+        onSessionChange={handleSessionChanged}
+        onLogout={handleLogout}
+      />
+    </SafeAreaProvider>
   );
 }
 

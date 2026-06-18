@@ -2,6 +2,9 @@ const { z } = require("zod");
 
 const uuidParamSchema = z.object({ id: z.string().uuid() }).strict();
 const orderIdParamSchema = z.object({ orderId: z.string().uuid() }).strict();
+const customerIdParamSchema = z
+  .object({ customerId: z.string().uuid() })
+  .strict();
 
 const initiatePaymentSchema = z
   .object({
@@ -47,6 +50,7 @@ const updateRefundStatusSchema = z
 module.exports = {
   uuidParamSchema,
   orderIdParamSchema,
+  customerIdParamSchema,
   initiatePaymentSchema,
   paymentStatusUpdateSchema,
   failPaymentSchema,

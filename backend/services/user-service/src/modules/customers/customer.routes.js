@@ -4,9 +4,16 @@ const { CustomerService } = require("./customer.service");
 const {
   uuidParamSchema,
   addressParamSchema,
+  familyProfileParamSchema,
+  reminderParamSchema,
   profileSchema,
   addressSchema,
   updateAddressSchema,
+  familyProfileSchema,
+  updateFamilyProfileSchema,
+  reminderSchema,
+  updateReminderSchema,
+  privacySettingsSchema,
 } = require("./customer.validators");
 
 function parse(schema, value) {
@@ -111,6 +118,124 @@ function createCustomerRoutes({
       const { userId, addressId } = parse(addressParamSchema, req.params);
       await customerService.deleteAddress(userId, addressId);
       res.status(204).send();
+    }),
+  );
+
+  router.get(
+    "/:userId/family-profiles",
+    asyncHandler(async (req, res) => {
+      const { userId } = parse(uuidParamSchema, req.params);
+      const profiles = await customerService.listFamilyProfiles(userId);
+      res.json({ data: profiles });
+    }),
+  );
+
+  router.post(
+    "/:userId/family-profiles",
+    asyncHandler(async (req, res) => {
+      const { userId } = parse(uuidParamSchema, req.params);
+      const payload = parse(familyProfileSchema, req.body);
+      const profile = await customerService.createFamilyProfile(
+        userId,
+        payload,
+      );
+      res.status(201).json({ data: profile });
+    }),
+  );
+
+  router.patch(
+    "/:userId/family-profiles/:familyProfileId",
+    asyncHandler(async (req, res) => {
+      const { userId, familyProfileId } = parse(
+        familyProfileParamSchema,
+        req.params,
+      );
+      const payload = parse(updateFamilyProfileSchema, req.body);
+      const profile = await customerService.updateFamilyProfile(
+        userId,
+        familyProfileId,
+        payload,
+      );
+      res.json({ data: profile });
+    }),
+  );
+
+  router.delete(
+    "/:userId/family-profiles/:familyProfileId",
+    asyncHandler(async (req, res) => {
+      const { userId, familyProfileId } = parse(
+        familyProfileParamSchema,
+        req.params,
+      );
+      await customerService.deleteFamilyProfile(userId, familyProfileId);
+      res.status(204).send();
+    }),
+  );
+
+  router.get(
+    "/:userId/medicine-reminders",
+    asyncHandler(async (req, res) => {
+      const { userId } = parse(uuidParamSchema, req.params);
+      const reminders = await customerService.listMedicineReminders(userId);
+      res.json({ data: reminders });
+    }),
+  );
+
+  router.post(
+    "/:userId/medicine-reminders",
+    asyncHandler(async (req, res) => {
+      const { userId } = parse(uuidParamSchema, req.params);
+      const payload = parse(reminderSchema, req.body);
+      const reminder = await customerService.createMedicineReminder(
+        userId,
+        payload,
+      );
+      res.status(201).json({ data: reminder });
+    }),
+  );
+
+  router.patch(
+    "/:userId/medicine-reminders/:reminderId",
+    asyncHandler(async (req, res) => {
+      const { userId, reminderId } = parse(reminderParamSchema, req.params);
+      const payload = parse(updateReminderSchema, req.body);
+      const reminder = await customerService.updateMedicineReminder(
+        userId,
+        reminderId,
+        payload,
+      );
+      res.json({ data: reminder });
+    }),
+  );
+
+  router.delete(
+    "/:userId/medicine-reminders/:reminderId",
+    asyncHandler(async (req, res) => {
+      const { userId, reminderId } = parse(reminderParamSchema, req.params);
+      await customerService.deleteMedicineReminder(userId, reminderId);
+      res.status(204).send();
+    }),
+  );
+
+  router.get(
+    "/:userId/privacy-settings",
+    asyncHandler(async (req, res) => {
+      const { userId } = parse(uuidParamSchema, req.params);
+      const settings = await customerService.getPrivacySettings(userId);
+      res.json({ data: settings });
+    }),
+  );
+
+  router.put(
+    "/:userId/privacy-settings",
+    asyncHandler(async (req, res) => {
+      const { userId } = parse(uuidParamSchema, req.params);
+      const payload = parse(privacySettingsSchema, req.body);
+      const settings = await customerService.updatePrivacySettings(
+        userId,
+        payload,
+      );
+      res.json({ data: settings });
     }),
   );
 

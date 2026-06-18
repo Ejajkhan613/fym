@@ -59,6 +59,11 @@ export const demoOrders: LocalOrder[] = [
     total: 214,
     createdAt: 'Today, 10:24 AM',
     itemsCount: 3,
+    itemsSummary: 'Dolo 650 Tablet, ORS sachets',
+    deliveryLabel: 'Home',
+    deliveryAddress: 'Koramangala 5th Block, Bengaluru, Karnataka, 560095',
+    paymentStatus: 'Payment pending',
+    orderType: 'OTC',
   },
   {
     id: 'FYM-1019',
@@ -66,5 +71,10 @@ export const demoOrders: LocalOrder[] = [
     total: 68,
     createdAt: '3 days ago',
     itemsCount: 1,
+    itemsSummary: 'Cetirizine 10mg',
+    deliveryLabel: 'Home',
+    deliveryAddress: 'Koramangala 5th Block, Bengaluru, Karnataka, 560095',
+    paymentStatus: 'Paid',
+    orderType: 'OTC',
   },
 ];

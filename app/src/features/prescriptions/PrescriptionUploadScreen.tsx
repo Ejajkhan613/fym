@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
-import { ArrowLeft, Camera, FileImage, FileText, Image, Info, Send, X } from 'lucide-react-native';
+import { ArrowLeft, Camera, FileImage, FileText, Image, Send, X } from 'lucide-react-native';
 import { StatusBar } from 'expo-status-bar';
 import { AppButton } from '../../components/AppButton';
 import { HeaderButton } from '../../components/HeaderButton';
@@ -34,22 +34,7 @@ type SelectedPrescriptionFile = {
 };
 
 export function PrescriptionUploadScreen({ session, onBack }: PrescriptionUploadScreenProps) {
-  const [files, setFiles] = useState<SelectedPrescriptionFile[]>([
-    {
-      id: 'demo-prescription-1',
-      name: 'prescription_doc_01.jpg',
-      size: 1200000,
-      uri: 'demo://prescription_doc_01.jpg',
-      mimeType: 'image/jpeg',
-    },
-    {
-      id: 'demo-prescription-2',
-      name: 'prescription_scan_02.png',
-      size: 890000,
-      uri: 'demo://prescription_scan_02.png',
-      mimeType: 'image/png',
-    },
-  ]);
+  const [files, setFiles] = useState<SelectedPrescriptionFile[]>([]);
   const [note, setNote] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -173,37 +158,37 @@ export function PrescriptionUploadScreen({ session, onBack }: PrescriptionUpload
           </View>
         </View>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Uploaded Prescriptions</Text>
-          <View style={styles.fileList}>
-            {files.map((file) => (
-              <View
-                key={file.id}
-                style={styles.fileRow}
-              >
-                <View style={styles.fileIcon}>
-                  <FileText color={colors.primary} size={34} strokeWidth={2.2} />
-                </View>
-                <View style={styles.fileCopy}>
-                  <Text
-                    numberOfLines={1}
-                    style={styles.fileName}
+        {files.length > 0 ? (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Uploaded Prescriptions</Text>
+            <View style={styles.fileList}>
+              {files.map((file) => (
+                <View key={file.id} style={styles.fileRow}>
+                  <View style={styles.fileIcon}>
+                    <FileText color={colors.primary} size={34} strokeWidth={2.2} />
+                  </View>
+                  <View style={styles.fileCopy}>
+                    <Text numberOfLines={1} style={styles.fileName}>
+                      {file.name}
+                    </Text>
+                    <Text style={styles.fileMeta}>
+                      {formatFileSize(file.size)} · Uploaded just now
+                    </Text>
+                  </View>
+                  <Pressable
+                    accessibilityRole="button"
+                    onPress={() =>
+                      setFiles((current) => current.filter((item) => item.id !== file.id))
+                    }
+                    style={styles.removeButton}
                   >
-                    {file.name}
-                  </Text>
-                  <Text style={styles.fileMeta}>{formatFileSize(file.size)} · Uploaded just now</Text>
+                    <X color={colors.danger} size={26} strokeWidth={2.2} />
+                  </Pressable>
                 </View>
-                <Pressable
-                  accessibilityRole="button"
-                  onPress={() => setFiles((current) => current.filter((item) => item.id !== file.id))}
-                  style={styles.removeButton}
-                >
-                  <X color={colors.danger} size={26} strokeWidth={2.2} />
-                </Pressable>
-              </View>
-            ))}
+              ))}
+            </View>
           </View>
-        </View>
+        ) : null}
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>
@@ -220,17 +205,8 @@ export function PrescriptionUploadScreen({ session, onBack }: PrescriptionUpload
           />
         </View>
 
-        <View style={styles.infoCard}>
-          <Info color={colors.primary} size={28} strokeWidth={2.2} />
-          <Text style={styles.infoText}>
-            Pharmacies within a <Text style={styles.boldText}>5 km radius</Text> will review your
-            prescription. The <Text style={styles.boldText}>first pharmacy to accept</Text> will
-            fulfill your order and arrange delivery to your location.
-          </Text>
-        </View>
-
         <AppButton
-          label="Submit Prescription"
+          label="Order Now"
           onPress={handleSubmit}
           loading={submitting}
           icon={<Send color="#FFFFFF" size={27} strokeWidth={2.2} />}
@@ -310,12 +286,12 @@ const styles = StyleSheet.create({
   },
   uploadActions: {
     marginTop: 30,
-    flexDirection: 'row',
+    flexDirection: 'column',
     gap: 14,
     width: '100%',
   },
   secondaryUploadAction: {
-    flex: 1,
+    width: '100%',
   },
   section: {
     gap: 14,
@@ -382,26 +358,5 @@ const styles = StyleSheet.create({
     lineHeight: 25,
     fontWeight: '500',
     padding: 18,
-  },
-  infoCard: {
-    borderWidth: 1,
-    borderColor: '#C5DCFF',
-    backgroundColor: colors.primarySofter,
-    borderRadius: 18,
-    padding: 20,
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 14,
-  },
-  infoText: {
-    flex: 1,
-    color: colors.muted,
-    fontSize: 16,
-    lineHeight: 25,
-    fontWeight: '600',
-  },
-  boldText: {
-    color: colors.text,
-    fontWeight: '900',
   },
 });

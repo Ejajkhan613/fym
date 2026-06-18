@@ -1,0 +1,101 @@
+Backend Docker build and run notes
+
+Prerequisites:
+- Docker Desktop or Docker Engine with Docker Compose v2 installed.
+- Run commands from the project root:
+  c:\Users\Lenovo\Desktop\FYM-Codex
+
+1. Create the backend environment file.
+
+   Copy the example file:
+
+   Windows PowerShell:
+   Copy-Item backend\.env.example backend\.env
+
+   macOS/Linux:
+   cp backend/.env.example backend/.env
+
+   Review backend\.env and replace placeholder secrets before using this outside
+   local development. The Docker Compose file also provides container-friendly
+   defaults for PostgreSQL, Redis, Kafka, and service URLs.
+
+2. Build the backend Docker images.
+
+   From the project root:
+
+   docker compose -f backend/infra/docker/docker-compose.yml build
+
+   This builds all backend services from:
+   backend/infra/docker/Dockerfile
+
+3. Start the backend stack.
+
+   From the project root:
+
+   docker compose -f backend/infra/docker/docker-compose.yml up
+
+   To run it in the background:
+
+   docker compose -f backend/infra/docker/docker-compose.yml up -d
+
+   Compose starts PostgreSQL, Redis, Kafka, runs the migrate service, then starts
+   the API gateway and backend microservices.
+
+4. Main service URLs and ports.
+
+   API gateway:
+   http://localhost:4000
+
+   Gateway health check:
+   http://localhost:4000/health
+
+   Individual service ports:
+   - auth-service: 4101
+   - user-service: 4102
+   - pharmacy-service: 4103
+   - catalog-service: 4104
+   - prescription-service: 4105
+   - order-service: 4106
+   - matching-service: 4107
+   - payment-service: 4108
+   - delivery-service: 4109
+   - notification-service: 4110
+   - support-service: 4111
+   - penalty-service: 4112
+   - audit-compliance-service: 4113
+   - analytics-service: 4114
+   - admin-service: 4115
+
+5. Useful Docker Compose commands.
+
+   View running containers:
+   docker compose -f backend/infra/docker/docker-compose.yml ps
+
+   View logs for the full stack:
+   docker compose -f backend/infra/docker/docker-compose.yml logs -f
+
+   View logs for only the API gateway:
+   docker compose -f backend/infra/docker/docker-compose.yml logs -f api-gateway
+
+   Rebuild and restart after code changes:
+   docker compose -f backend/infra/docker/docker-compose.yml up -d --build
+
+   Run database migrations manually:
+   docker compose -f backend/infra/docker/docker-compose.yml run --rm migrate
+
+6. Stop the backend stack.
+
+   Stop containers but keep database and Redis volumes:
+   docker compose -f backend/infra/docker/docker-compose.yml down
+
+   Stop containers and remove PostgreSQL/Redis data volumes:
+   docker compose -f backend/infra/docker/docker-compose.yml down -v
+
+Notes:
+- The compose project name is fym-backend.
+- The shared backend Docker image uses Node 22 Alpine and installs production
+  dependencies with npm ci --omit=dev.
+- The migrate container runs npm run db:migrate before app services are allowed
+  to start.
+- PostgreSQL is exposed on localhost:5432, Redis on localhost:6379, and Kafka on
+  localhost:9092.

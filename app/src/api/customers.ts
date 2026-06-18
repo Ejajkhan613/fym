@@ -3,8 +3,14 @@ import type { ApiEnvelope } from '../types/api';
 import type {
   CreateCustomerAddressPayload,
   CustomerAddress,
+  CustomerFamilyProfile,
   CustomerProfile,
+  CustomerPrivacySettings,
+  MedicineReminder,
   UpdateCustomerAddressPayload,
+  UpdatePrivacySettingsPayload,
+  UpsertCustomerFamilyProfilePayload,
+  UpsertMedicineReminderPayload,
   UpsertCustomerProfilePayload,
 } from '../types/domain';
 
@@ -80,4 +86,124 @@ export function deleteCustomerAddress(
     method: 'DELETE',
     accessToken,
   });
+}
+
+export function listCustomerFamilyProfiles(userId: string, accessToken?: string) {
+  return apiRequest<ApiEnvelope<CustomerFamilyProfile[]>>(
+    `/customers/${userId}/family-profiles`,
+    { accessToken },
+  );
+}
+
+export function createCustomerFamilyProfile(
+  userId: string,
+  payload: UpsertCustomerFamilyProfilePayload,
+  accessToken?: string,
+) {
+  return apiRequest<ApiEnvelope<CustomerFamilyProfile>>(
+    `/customers/${userId}/family-profiles`,
+    {
+      method: 'POST',
+      body: JSON.stringify(payload),
+      accessToken,
+    },
+  );
+}
+
+export function updateCustomerFamilyProfile(
+  userId: string,
+  familyProfileId: string,
+  payload: Partial<UpsertCustomerFamilyProfilePayload>,
+  accessToken?: string,
+) {
+  return apiRequest<ApiEnvelope<CustomerFamilyProfile>>(
+    `/customers/${userId}/family-profiles/${familyProfileId}`,
+    {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+      accessToken,
+    },
+  );
+}
+
+export function deleteCustomerFamilyProfile(
+  userId: string,
+  familyProfileId: string,
+  accessToken?: string,
+) {
+  return apiRequest<null>(`/customers/${userId}/family-profiles/${familyProfileId}`, {
+    method: 'DELETE',
+    accessToken,
+  });
+}
+
+export function listMedicineReminders(userId: string, accessToken?: string) {
+  return apiRequest<ApiEnvelope<MedicineReminder[]>>(
+    `/customers/${userId}/medicine-reminders`,
+    { accessToken },
+  );
+}
+
+export function createMedicineReminder(
+  userId: string,
+  payload: UpsertMedicineReminderPayload,
+  accessToken?: string,
+) {
+  return apiRequest<ApiEnvelope<MedicineReminder>>(
+    `/customers/${userId}/medicine-reminders`,
+    {
+      method: 'POST',
+      body: JSON.stringify(payload),
+      accessToken,
+    },
+  );
+}
+
+export function updateMedicineReminder(
+  userId: string,
+  reminderId: string,
+  payload: Partial<UpsertMedicineReminderPayload>,
+  accessToken?: string,
+) {
+  return apiRequest<ApiEnvelope<MedicineReminder>>(
+    `/customers/${userId}/medicine-reminders/${reminderId}`,
+    {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+      accessToken,
+    },
+  );
+}
+
+export function deleteMedicineReminder(
+  userId: string,
+  reminderId: string,
+  accessToken?: string,
+) {
+  return apiRequest<null>(`/customers/${userId}/medicine-reminders/${reminderId}`, {
+    method: 'DELETE',
+    accessToken,
+  });
+}
+
+export function getPrivacySettings(userId: string, accessToken?: string) {
+  return apiRequest<ApiEnvelope<CustomerPrivacySettings>>(
+    `/customers/${userId}/privacy-settings`,
+    { accessToken },
+  );
+}
+
+export function updatePrivacySettings(
+  userId: string,
+  payload: UpdatePrivacySettingsPayload,
+  accessToken?: string,
+) {
+  return apiRequest<ApiEnvelope<CustomerPrivacySettings>>(
+    `/customers/${userId}/privacy-settings`,
+    {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+      accessToken,
+    },
+  );
 }

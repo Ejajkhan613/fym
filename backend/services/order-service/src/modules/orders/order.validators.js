@@ -108,6 +108,29 @@ const cancelCustomerOrderSchema = z
   })
   .strict();
 
+const listRealtimeEventsQuerySchema = z
+  .object({
+    channel: z
+      .string()
+      .trim()
+      .regex(
+        /^(customer|pharmacy|order):[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
+      ),
+    orderId: z.string().uuid().optional(),
+    eventName: z.string().trim().min(1).max(120).optional(),
+    afterId: z.string().uuid().optional(),
+    after: z
+      .string()
+      .trim()
+      .refine((value) => !Number.isNaN(Date.parse(value)), {
+        message: "Invalid datetime",
+      })
+      .optional(),
+    direction: z.enum(["asc", "desc"]).default("asc"),
+    limit: z.coerce.number().int().min(1).max(100).default(50),
+  })
+  .strict();
+
 module.exports = {
   uuidParamSchema,
   createOrderSchema,
@@ -118,4 +141,5 @@ module.exports = {
   rejectOfferSchema,
   transitionOrderSchema,
   cancelCustomerOrderSchema,
+  listRealtimeEventsQuerySchema,
 };

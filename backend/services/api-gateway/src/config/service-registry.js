@@ -31,7 +31,7 @@ function getServiceRegistry(env = process.env) {
     },
     {
       name: "order-service",
-      prefixes: ["/cart", "/orders", "/pharmacy/orders"],
+      prefixes: ["/cart", "/orders", "/pharmacy/orders", "/realtime"],
       url: env.ORDER_SERVICE_URL || "http://localhost:4106",
     },
     {

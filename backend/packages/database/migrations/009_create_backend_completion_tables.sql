@@ -5,10 +5,6 @@ CREATE TABLE IF NOT EXISTS customer_profiles (
   user_id uuid NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
   date_of_birth date,
   gender varchar(40),
-  emergency_contact_name varchar(120),
-  emergency_contact_phone varchar(20),
-  abha_id_optional varchar(80),
-  metadata jsonb NOT NULL DEFAULT '{}'::jsonb,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
 

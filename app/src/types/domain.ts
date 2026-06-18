@@ -71,6 +71,11 @@ export type LocalOrder = {
   total: number;
   createdAt: string;
   itemsCount: number;
+  itemsSummary?: string;
+  deliveryLabel?: string;
+  deliveryAddress?: string;
+  paymentStatus?: string;
+  orderType?: string;
 };
 
 export type CustomerGender = 'male' | 'female' | 'other' | 'prefer_not_to_say';
@@ -80,10 +85,6 @@ export type CustomerProfile = {
   userId: string;
   dateOfBirth?: string | null;
   gender?: CustomerGender | null;
-  emergencyContactName?: string | null;
-  emergencyContactPhone?: string | null;
-  abhaIdOptional?: string | null;
-  metadata: Record<string, unknown>;
   createdAt?: string;
   updatedAt?: string;
 };
@@ -91,10 +92,24 @@ export type CustomerProfile = {
 export type UpsertCustomerProfilePayload = {
   dateOfBirth?: string;
   gender?: CustomerGender;
-  emergencyContactName?: string;
-  emergencyContactPhone?: string;
-  abhaIdOptional?: string;
-  metadata?: Record<string, unknown>;
+};
+
+export type CustomerFamilyProfile = {
+  id: string;
+  userId: string;
+  fullName: string;
+  relationship: string;
+  dateOfBirth?: string | null;
+  gender?: CustomerGender | null;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export type UpsertCustomerFamilyProfilePayload = {
+  fullName: string;
+  relationship: string;
+  dateOfBirth?: string;
+  gender?: CustomerGender;
 };
 
 export type CustomerAddress = {
@@ -132,3 +147,159 @@ export type CreateCustomerAddressPayload = {
 };
 
 export type UpdateCustomerAddressPayload = Partial<CreateCustomerAddressPayload>;
+
+export type MedicineReminder = {
+  id: string;
+  userId: string;
+  familyProfileId?: string | null;
+  medicineName: string;
+  dosage?: string | null;
+  frequency: string;
+  scheduleTime: string;
+  startDate: string;
+  endDate?: string | null;
+  notes?: string | null;
+  isActive: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export type UpsertMedicineReminderPayload = {
+  familyProfileId?: string;
+  medicineName: string;
+  dosage?: string;
+  frequency: string;
+  scheduleTime: string;
+  startDate: string;
+  endDate?: string;
+  notes?: string;
+  isActive?: boolean;
+};
+
+export type CustomerPrivacySettings = {
+  userId: string;
+  pushNotificationsEnabled: boolean;
+  smsNotificationsEnabled: boolean;
+  orderUpdatesEnabled: boolean;
+  prescriptionUpdatesEnabled: boolean;
+  supportUpdatesEnabled: boolean;
+  medicineRemindersEnabled: boolean;
+  promotionalOffersEnabled: boolean;
+  dataSharingConsent: boolean;
+  gpsForAddressesEnabled: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export type UpdatePrivacySettingsPayload = Partial<
+  Omit<CustomerPrivacySettings, 'userId' | 'createdAt' | 'updatedAt'>
+>;
+
+export type PrescriptionRecord = {
+  id: string;
+  customerId: string;
+  orderId?: string | null;
+  fileUrl: string;
+  fileType: 'image' | 'pdf';
+  ocrText?: string | null;
+  extractedItems: Array<Record<string, unknown>>;
+  verificationStatus: string;
+  confidenceScore?: number | null;
+  rejectionReason?: string | null;
+  fraudFlags: string[];
+  uploadedAt?: string;
+  reviewedAt?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export type PaymentTransaction = {
+  id: string;
+  orderId: string;
+  customerId: string;
+  provider: string;
+  providerReference?: string | null;
+  paymentMethod: string;
+  amount: number;
+  currency: string;
+  status: string;
+  metadata: Record<string, unknown>;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export type RefundRecord = {
+  id: string;
+  paymentTransactionId: string;
+  orderId: string;
+  amount: number;
+  status: string;
+  reason?: string | null;
+  providerReference?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export type CustomerPaymentSummary = {
+  payments: PaymentTransaction[];
+  refunds: RefundRecord[];
+};
+
+export type SupportTicket = {
+  id: string;
+  customerId?: string | null;
+  orderId?: string | null;
+  category: string;
+  priority: 'low' | 'medium' | 'high' | 'urgent';
+  status: 'open' | 'in_progress' | 'waiting_on_customer' | 'resolved' | 'closed';
+  subject: string;
+  description: string;
+  resolution?: string | null;
+  metadata: Record<string, unknown>;
+  createdAt?: string;
+  updatedAt?: string;
+  closedAt?: string | null;
+};
+
+export type SupportMessage = {
+  id: string;
+  ticketId: string;
+  senderUserId?: string | null;
+  senderType: string;
+  message: string;
+  attachmentUrls: string[];
+  metadata: Record<string, unknown>;
+  createdAt?: string;
+};
+
+export type SupportTicketDetails = {
+  ticket: SupportTicket;
+  messages: SupportMessage[];
+};
+
+export type CreateSupportTicketPayload = {
+  customerId: string;
+  orderId?: string;
+  category: string;
+  priority?: SupportTicket['priority'];
+  subject: string;
+  description: string;
+  metadata?: Record<string, unknown>;
+};
+
+export type CustomerNotification = {
+  id: string;
+  recipientUserId?: string | null;
+  channel: 'push' | 'sms' | 'email' | 'websocket';
+  templateKey: string;
+  title?: string | null;
+  body: string;
+  payload: Record<string, unknown>;
+  status: 'QUEUED' | 'SENT' | 'FAILED' | 'CANCELLED';
+  scheduledAt?: string | null;
+  sentAt?: string | null;
+  failedAt?: string | null;
+  failureReason?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+};

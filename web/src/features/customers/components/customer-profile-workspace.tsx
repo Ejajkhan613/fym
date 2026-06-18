@@ -8,7 +8,6 @@ import {
   CircleAlert,
   CreditCard,
   FileText,
-  HeartPulse,
   Home,
   IdCard,
   LogOut,
@@ -55,7 +54,7 @@ import { cn } from "@/shared/utils/cn";
 const accountNav = [
   { label: "Overview", icon: Star },
   { label: "Profile", icon: UserRound },
-  { label: "Health profile", icon: HeartPulse },
+  { label: "Profile details", icon: IdCard },
   { label: "Addresses", icon: Home },
   { label: "Prescriptions", icon: FileText },
   { label: "Payments", icon: CreditCard },
@@ -132,9 +131,6 @@ export function CustomerProfileWorkspace() {
     defaultValues: {
       dateOfBirth: "",
       gender: undefined,
-      emergencyContactName: "",
-      emergencyContactPhone: "",
-      abhaIdOptional: "",
     },
   });
 
@@ -167,9 +163,6 @@ export function CustomerProfileWorkspace() {
       profileForm.reset({
         dateOfBirth: formatDateInput(profileQuery.data.dateOfBirth),
         gender: profileQuery.data.gender || undefined,
-        emergencyContactName: profileQuery.data.emergencyContactName || "",
-        emergencyContactPhone: profileQuery.data.emergencyContactPhone || "",
-        abhaIdOptional: profileQuery.data.abhaIdOptional || "",
       });
     }
   }, [profileForm, profileQuery.data]);
@@ -399,8 +392,8 @@ export function CustomerProfileWorkspace() {
               tone="primary"
             />
             <MetricCard
-              icon={HeartPulse}
-              label="Health profile"
+              icon={IdCard}
+              label="Profile details"
               value={profileComplete ? "Ready" : "Pending"}
               tone={profileComplete ? "primary" : "warning"}
             />
@@ -448,7 +441,7 @@ export function CustomerProfileWorkspace() {
           <SectionCard
             eyebrow="Patient"
             icon={IdCard}
-            title="Health profile"
+            title="Profile details"
           >
             <form
               className="grid gap-4"
@@ -477,26 +470,10 @@ export function CustomerProfileWorkspace() {
                   <option value="prefer_not_to_say">Prefer not to say</option>
                 </select>
               </label>
-              <TextField
-                error={profileForm.formState.errors.emergencyContactName?.message}
-                label="Emergency contact name"
-                registration={profileForm.register("emergencyContactName")}
-              />
-              <TextField
-                error={profileForm.formState.errors.emergencyContactPhone?.message}
-                inputMode="tel"
-                label="Emergency contact phone"
-                registration={profileForm.register("emergencyContactPhone")}
-              />
-              <TextField
-                error={profileForm.formState.errors.abhaIdOptional?.message}
-                label="ABHA ID optional"
-                registration={profileForm.register("abhaIdOptional")}
-              />
               <MutationMessage
                 error={profileMutation.error}
                 success={profileMutation.isSuccess}
-                successText="Health profile saved"
+                successText="Profile details saved"
               />
               <PrimaryButton disabled={profileMutation.isPending}>
                 Save profile

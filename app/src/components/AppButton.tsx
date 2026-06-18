@@ -85,6 +85,8 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 18,
     fontWeight: '800',
+    flexShrink: 1,
+    textAlign: 'center',
   },
   primaryLabel: {
     color: '#FFFFFF',

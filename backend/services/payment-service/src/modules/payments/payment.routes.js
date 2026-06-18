@@ -5,6 +5,7 @@ const { PaymentService } = require("./payment.service");
 const {
   uuidParamSchema,
   orderIdParamSchema,
+  customerIdParamSchema,
   initiatePaymentSchema,
   paymentStatusUpdateSchema,
   failPaymentSchema,
@@ -39,6 +40,15 @@ function createPaymentRoutes({ paymentService = new PaymentService() } = {}) {
       const payload = parse(initiatePaymentSchema, req.body);
       const payment = await paymentService.initiate(payload);
       res.status(201).json({ data: payment });
+    }),
+  );
+
+  router.get(
+    "/customer/:customerId",
+    asyncHandler(async (req, res) => {
+      const { customerId } = parse(customerIdParamSchema, req.params);
+      const summary = await paymentService.listForCustomer(customerId);
+      res.json({ data: summary });
     }),
   );
 

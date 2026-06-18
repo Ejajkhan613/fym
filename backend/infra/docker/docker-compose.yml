@@ -1,0 +1,307 @@
+name: fym-backend
+
+x-backend-service: &backend-service
+  build:
+    context: ../..
+    dockerfile: infra/docker/Dockerfile
+  env_file:
+    - ../../.env
+  environment: &backend-env
+    NODE_ENV: development
+    DATABASE_URL: postgresql://fym:change_me@postgres:5432/fym
+    REDIS_URL: redis://redis:6379
+    KAFKA_BROKERS: kafka:9092
+    S3_ENDPOINT: ""
+    S3_REGION: ap-south-1
+    S3_BUCKET: speedomed-fym
+  restart: unless-stopped
+
+x-infra-depends: &infra-depends
+  postgres:
+    condition: service_healthy
+  redis:
+    condition: service_healthy
+  kafka:
+    condition: service_healthy
+
+x-app-depends: &app-depends
+  postgres:
+    condition: service_healthy
+  redis:
+    condition: service_healthy
+  kafka:
+    condition: service_healthy
+  migrate:
+    condition: service_completed_successfully
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: fym-postgres
+    environment:
+      POSTGRES_DB: fym
+      POSTGRES_USER: fym
+      POSTGRES_PASSWORD: change_me
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fym -d fym"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: fym-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  kafka:
+    image: apache/kafka:3.7.0
+    container_name: fym-kafka
+    environment:
+      CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_LISTENERS: PLAINTEXT://:9092,EXTERNAL://:29092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,EXTERNAL://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,EXTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_LOG_DIRS: /tmp/kraft-combined-logs
+    ports:
+      - "9092:29092"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list >/dev/null 2>&1",
+        ]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+
+  migrate:
+    <<: *backend-service
+    container_name: fym-backend-migrate
+    command: ["npm", "run", "db:migrate"]
+    depends_on: *infra-depends
+    restart: "no"
+
+  api-gateway:
+    <<: *backend-service
+    container_name: fym-api-gateway
+    command: ["node", "scripts/start-service.js", "api-gateway"]
+    depends_on: *app-depends
+    environment:
+      <<: *backend-env
+      PORT: 4000
+      AUTH_SERVICE_URL: http://auth-service:4101
+      USER_SERVICE_URL: http://user-service:4102
+      PHARMACY_SERVICE_URL: http://pharmacy-service:4103
+      CATALOG_SERVICE_URL: http://catalog-service:4104
+      PRESCRIPTION_SERVICE_URL: http://prescription-service:4105
+      ORDER_SERVICE_URL: http://order-service:4106
+      MATCHING_SERVICE_URL: http://matching-service:4107
+      PAYMENT_SERVICE_URL: http://payment-service:4108
+      DELIVERY_SERVICE_URL: http://delivery-service:4109
+      NOTIFICATION_SERVICE_URL: http://notification-service:4110
+      SUPPORT_SERVICE_URL: http://support-service:4111
+      PENALTY_SERVICE_URL: http://penalty-service:4112
+      AUDIT_COMPLIANCE_SERVICE_URL: http://audit-compliance-service:4113
+      ANALYTICS_SERVICE_URL: http://analytics-service:4114
+      ADMIN_SERVICE_URL: http://admin-service:4115
+    ports:
+      - "4000:4000"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          'node -e "fetch(''http://127.0.0.1:4000/health'').then((r) => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"',
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  auth-service:
+    <<: *backend-service
+    container_name: fym-auth-service
+    command: ["node", "scripts/start-service.js", "auth"]
+    depends_on: *app-depends
+    environment:
+      <<: *backend-env
+      PORT: 4101
+    ports:
+      - "4101:4101"
+
+  user-service:
+    <<: *backend-service
+    container_name: fym-user-service
+    command: ["node", "scripts/start-service.js", "user"]
+    depends_on: *app-depends
+    environment:
+      <<: *backend-env
+      PORT: 4102
+    ports:
+      - "4102:4102"
+
+  pharmacy-service:
+    <<: *backend-service
+    container_name: fym-pharmacy-service
+    command: ["node", "scripts/start-service.js", "pharmacy"]
+    depends_on: *app-depends
+    environment:
+      <<: *backend-env
+      PORT: 4103
+    ports:
+      - "4103:4103"
+
+  catalog-service:
+    <<: *backend-service
+    container_name: fym-catalog-service
+    command: ["node", "scripts/start-service.js", "catalog"]
+    depends_on: *app-depends
+    environment:
+      <<: *backend-env
+      PORT: 4104
+    ports:
+      - "4104:4104"
+
+  prescription-service:
+    <<: *backend-service
+    container_name: fym-prescription-service
+    command: ["node", "scripts/start-service.js", "prescription"]
+    depends_on: *app-depends
+    environment:
+      <<: *backend-env
+      PORT: 4105
+    ports:
+      - "4105:4105"
+
+  order-service:
+    <<: *backend-service
+    container_name: fym-order-service
+    command: ["node", "scripts/start-service.js", "order"]
+    depends_on: *app-depends
+    environment:
+      <<: *backend-env
+      PORT: 4106
+    ports:
+      - "4106:4106"
+
+  matching-service:
+    <<: *backend-service
+    container_name: fym-matching-service
+    command: ["node", "scripts/start-service.js", "matching"]
+    depends_on: *app-depends
+    environment:
+      <<: *backend-env
+      PORT: 4107
+    ports:
+      - "4107:4107"
+
+  payment-service:
+    <<: *backend-service
+    container_name: fym-payment-service
+    command: ["node", "scripts/start-service.js", "payment"]
+    depends_on: *app-depends
+    environment:
+      <<: *backend-env
+      PORT: 4108
+    ports:
+      - "4108:4108"
+
+  delivery-service:
+    <<: *backend-service
+    container_name: fym-delivery-service
+    command: ["node", "scripts/start-service.js", "delivery"]
+    depends_on: *app-depends
+    environment:
+      <<: *backend-env
+      PORT: 4109
+    ports:
+      - "4109:4109"
+
+  notification-service:
+    <<: *backend-service
+    container_name: fym-notification-service
+    command: ["node", "scripts/start-service.js", "notification"]
+    depends_on: *app-depends
+    environment:
+      <<: *backend-env
+      PORT: 4110
+    ports:
+      - "4110:4110"
+
+  support-service:
+    <<: *backend-service
+    container_name: fym-support-service
+    command: ["node", "scripts/start-service.js", "support"]
+    depends_on: *app-depends
+    environment:
+      <<: *backend-env
+      PORT: 4111
+    ports:
+      - "4111:4111"
+
+  penalty-service:
+    <<: *backend-service
+    container_name: fym-penalty-service
+    command: ["node", "scripts/start-service.js", "penalty"]
+    depends_on: *app-depends
+    environment:
+      <<: *backend-env
+      PORT: 4112
+    ports:
+      - "4112:4112"
+
+  audit-compliance-service:
+    <<: *backend-service
+    container_name: fym-audit-compliance-service
+    command: ["node", "scripts/start-service.js", "audit"]
+    depends_on: *app-depends
+    environment:
+      <<: *backend-env
+      PORT: 4113
+    ports:
+      - "4113:4113"
+
+  analytics-service:
+    <<: *backend-service
+    container_name: fym-analytics-service
+    command: ["node", "scripts/start-service.js", "analytics"]
+    depends_on: *app-depends
+    environment:
+      <<: *backend-env
+      PORT: 4114
+    ports:
+      - "4114:4114"
+
+  admin-service:
+    <<: *backend-service
+    container_name: fym-admin-service
+    command: ["node", "scripts/start-service.js", "admin"]
+    depends_on: *app-depends
+    environment:
+      <<: *backend-env
+      PORT: 4115
+    ports:
+      - "4115:4115"
+
+volumes:
+  postgres-data:
+  redis-data:

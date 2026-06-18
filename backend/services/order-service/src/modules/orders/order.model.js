@@ -477,6 +477,71 @@ class OrderModel {
     return result.rows.map(mapHistoryRow);
   }
 
+  async listRealtimeEvents(filters = {}) {
+    const values = [filters.channel];
+    const clauses = ["e.channel = $1"];
+
+    if (filters.aggregateId) {
+      values.push(filters.aggregateId);
+      clauses.push(`e.aggregate_id = $${values.length}`);
+    }
+
+    if (filters.eventName) {
+      values.push(filters.eventName);
+      clauses.push(`e.event_name = $${values.length}`);
+    }
+
+    if (filters.afterId) {
+      values.push(filters.afterId);
+      const cursorParam = values.length;
+      clauses.push(`
+        (
+          NOT EXISTS (
+            SELECT 1
+            FROM realtime_events cursor_event
+            WHERE cursor_event.id = $${cursorParam}
+          )
+          OR (e.created_at, e.id) > (
+            SELECT cursor_event.created_at, cursor_event.id
+            FROM realtime_events cursor_event
+            WHERE cursor_event.id = $${cursorParam}
+          )
+        )
+      `);
+    } else if (filters.after) {
+      values.push(filters.after);
+      clauses.push(`e.created_at > $${values.length}::timestamptz`);
+    }
+
+    values.push(filters.limit || 50);
+    const limitParam = values.length;
+    const direction = filters.direction === "desc" ? "DESC" : "ASC";
+
+    const result = await this.pool.query(
+      `
+        SELECT
+          e.id,
+          e.aggregate_type,
+          e.aggregate_id,
+          e.event_name,
+          e.channel,
+          e.payload,
+          e.published_at,
+          e.created_at
+        FROM realtime_events e
+        WHERE ${clauses.join(" AND ")}
+        ORDER BY e.created_at ${direction}, e.id ${direction}
+        LIMIT $${limitParam}
+      `,
+      values,
+    );
+
+    return {
+      events: result.rows.map(mapRealtimeEventRow),
+      total: result.rows.length,
+    };
+  }
+
   async listPharmacyOffers(filters) {
     const values = [filters.pharmacyId];
     const clauses = ["o.pharmacy_id = $1"];
@@ -514,25 +579,97 @@ class OrderModel {
     };
   }
 
-  async markOfferViewed(orderId, pharmacyId) {
-    const result = await this.pool.query(
-      `
-        UPDATE vendor_order_offers
-        SET status = CASE
-              WHEN status = 'OFFER_SENT' THEN 'OFFER_VIEWED'
-              ELSE status
-            END,
-            viewed_at = COALESCE(viewed_at, now()),
-            updated_at = now()
-        WHERE order_id = $1
-          AND pharmacy_id = $2
-          AND status IN ('OFFER_SENT', 'OFFER_VIEWED')
-        RETURNING ${OFFER_COLUMNS}
-      `,
-      [orderId, pharmacyId],
-    );
+  async expirePharmacyOffers(pharmacyId) {
+    const client = await this.pool.connect();
 
-    return mapOfferRow(result.rows[0]);
+    try {
+      await client.query("BEGIN");
+
+      const result = await client.query(
+        `
+          UPDATE vendor_order_offers
+          SET status = 'OFFER_EXPIRED',
+              updated_at = now()
+          WHERE pharmacy_id = $1
+            AND status IN ('OFFER_SENT', 'OFFER_VIEWED')
+            AND expires_at <= now()
+          RETURNING ${OFFER_COLUMNS}
+        `,
+        [pharmacyId],
+      );
+
+      const offers = result.rows.map(mapOfferRow);
+      const realtimeEvents = [];
+
+      for (const offer of offers) {
+        realtimeEvents.push(
+          await this.insertRealtimeEvent(client, {
+            aggregateType: "order",
+            aggregateId: offer.orderId,
+            eventName: "VendorOfferExpired",
+            channel: `pharmacy:${offer.pharmacyId}`,
+            payload: { offer },
+          }),
+        );
+      }
+
+      await client.query("COMMIT");
+
+      return { offers, realtimeEvents };
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  async markOfferViewed(orderId, pharmacyId) {
+    const client = await this.pool.connect();
+
+    try {
+      await client.query("BEGIN");
+
+      const result = await client.query(
+        `
+          UPDATE vendor_order_offers
+          SET status = CASE
+                WHEN status = 'OFFER_SENT' THEN 'OFFER_VIEWED'
+                ELSE status
+              END,
+              viewed_at = COALESCE(viewed_at, now()),
+              updated_at = now()
+          WHERE order_id = $1
+            AND pharmacy_id = $2
+            AND status IN ('OFFER_SENT', 'OFFER_VIEWED')
+          RETURNING ${OFFER_COLUMNS}
+        `,
+        [orderId, pharmacyId],
+      );
+
+      if (!result.rows[0]) {
+        await client.query("ROLLBACK");
+        return null;
+      }
+
+      const offer = mapOfferRow(result.rows[0]);
+      const event = await this.insertRealtimeEvent(client, {
+        aggregateType: "order",
+        aggregateId: orderId,
+        eventName: "VendorOfferViewed",
+        channel: `pharmacy:${pharmacyId}`,
+        payload: { offer },
+      });
+
+      await client.query("COMMIT");
+
+      return { offer, realtimeEvents: [event] };
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 
   async acceptOffer(orderId, pharmacyId, input) {
@@ -565,17 +702,31 @@ class OrderModel {
       }
 
       if (new Date(offer.expires_at).getTime() <= Date.now()) {
-        await client.query(
+        const expiredOfferResult = await client.query(
           `
             UPDATE vendor_order_offers
             SET status = 'OFFER_EXPIRED',
                 updated_at = now()
             WHERE id = $1
+            RETURNING ${OFFER_COLUMNS}
           `,
           [offer.id],
         );
+        const expiredOffer = mapOfferRow(expiredOfferResult.rows[0]);
+        const expiredEvent = await this.insertRealtimeEvent(client, {
+          aggregateType: "order",
+          aggregateId: orderId,
+          eventName: "VendorOfferExpired",
+          channel: `pharmacy:${pharmacyId}`,
+          payload: { offer: expiredOffer },
+        });
+
         await client.query("COMMIT");
-        return { outcome: "OFFER_EXPIRED", offer: mapOfferRow(offer) };
+        return {
+          outcome: "OFFER_EXPIRED",
+          offer: expiredOffer,
+          realtimeEvents: [expiredEvent],
+        };
       }
 
       const orderUpdate = await client.query(
@@ -593,7 +744,7 @@ class OrderModel {
       );
 
       if (orderUpdate.rowCount !== 1) {
-        await client.query(
+        const closedOfferResult = await client.query(
           `
             UPDATE vendor_order_offers
             SET status = 'OFFER_CLOSED_ORDER_ASSIGNED_ELSEWHERE',
@@ -602,11 +753,31 @@ class OrderModel {
             WHERE order_id = $1
               AND pharmacy_id = $2
               AND status IN ('OFFER_SENT', 'OFFER_VIEWED')
+            RETURNING ${OFFER_COLUMNS}
           `,
           [orderId, pharmacyId],
         );
+        const closedOffer = mapOfferRow(closedOfferResult.rows[0]);
+        const realtimeEvents = [];
+
+        if (closedOffer) {
+          realtimeEvents.push(
+            await this.insertRealtimeEvent(client, {
+              aggregateType: "order",
+              aggregateId: orderId,
+              eventName: "VendorOfferClosed",
+              channel: `pharmacy:${pharmacyId}`,
+              payload: { offer: closedOffer },
+            }),
+          );
+        }
+
         await client.query("COMMIT");
-        return { outcome: "ORDER_ALREADY_ASSIGNED" };
+        return {
+          outcome: "ORDER_ALREADY_ASSIGNED",
+          offer: closedOffer,
+          realtimeEvents,
+        };
       }
 
       const acceptedOfferResult = await client.query(
@@ -633,7 +804,7 @@ class OrderModel {
         ],
       );
 
-      await client.query(
+      const closedOffersResult = await client.query(
         `
           UPDATE vendor_order_offers
           SET status = 'OFFER_CLOSED_ORDER_ASSIGNED_ELSEWHERE',
@@ -641,12 +812,14 @@ class OrderModel {
           WHERE order_id = $1
             AND pharmacy_id != $2
             AND status IN ('OFFER_SENT', 'OFFER_VIEWED')
+          RETURNING ${OFFER_COLUMNS}
         `,
         [orderId, pharmacyId],
       );
 
       const order = mapOrderRow(orderUpdate.rows[0]);
       const acceptedOffer = mapOfferRow(acceptedOfferResult.rows[0]);
+      const closedOffers = closedOffersResult.rows.map(mapOfferRow);
 
       await this.insertStatusHistory(client, {
         orderId,
@@ -677,13 +850,27 @@ class OrderModel {
         payload: { order, offer: acceptedOffer },
       });
 
+      const closedOfferEvents = [];
+
+      for (const closedOffer of closedOffers) {
+        closedOfferEvents.push(
+          await this.insertRealtimeEvent(client, {
+            aggregateType: "order",
+            aggregateId: orderId,
+            eventName: "VendorOfferClosed",
+            channel: `pharmacy:${closedOffer.pharmacyId}`,
+            payload: { order, offer: closedOffer },
+          }),
+        );
+      }
+
       await client.query("COMMIT");
 
       return {
         outcome: "ACCEPTED",
         order,
         offer: acceptedOffer,
-        realtimeEvents: [customerEvent, pharmacyEvent],
+        realtimeEvents: [customerEvent, pharmacyEvent, ...closedOfferEvents],
       };
     } catch (error) {
       await client.query("ROLLBACK");
@@ -694,22 +881,49 @@ class OrderModel {
   }
 
   async rejectOffer(orderId, pharmacyId, reason) {
-    const result = await this.pool.query(
-      `
-        UPDATE vendor_order_offers
-        SET status = 'OFFER_REJECTED',
-            responded_at = now(),
-            rejection_reason = $3,
-            updated_at = now()
-        WHERE order_id = $1
-          AND pharmacy_id = $2
-          AND status IN ('OFFER_SENT', 'OFFER_VIEWED')
-        RETURNING ${OFFER_COLUMNS}
-      `,
-      [orderId, pharmacyId, reason],
-    );
+    const client = await this.pool.connect();
 
-    return mapOfferRow(result.rows[0]);
+    try {
+      await client.query("BEGIN");
+
+      const result = await client.query(
+        `
+          UPDATE vendor_order_offers
+          SET status = 'OFFER_REJECTED',
+              responded_at = now(),
+              rejection_reason = $3,
+              updated_at = now()
+          WHERE order_id = $1
+            AND pharmacy_id = $2
+            AND status IN ('OFFER_SENT', 'OFFER_VIEWED')
+          RETURNING ${OFFER_COLUMNS}
+        `,
+        [orderId, pharmacyId, reason],
+      );
+
+      if (!result.rows[0]) {
+        await client.query("ROLLBACK");
+        return null;
+      }
+
+      const offer = mapOfferRow(result.rows[0]);
+      const event = await this.insertRealtimeEvent(client, {
+        aggregateType: "order",
+        aggregateId: orderId,
+        eventName: "VendorRejected",
+        channel: `pharmacy:${pharmacyId}`,
+        payload: { offer },
+      });
+
+      await client.query("COMMIT");
+
+      return { offer, realtimeEvents: [event] };
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 
   async updateOrderStatus(orderId, statusChange) {

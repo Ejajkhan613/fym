@@ -1,12 +1,45 @@
 import { apiRequest } from './http';
 import type { ApiEnvelope } from '../types/api';
-import type { CartEntry } from '../types/domain';
+import type { CartEntry, CustomerAddress } from '../types/domain';
+import { toDeliveryAddress } from '../utils/addresses';
+
+export type ApiOrder = {
+  id: string;
+  customerId: string;
+  pharmacyId?: string | null;
+  status: string;
+  orderType?: string | null;
+  paymentStatus?: string | null;
+  subtotal?: number | null;
+  deliveryFee?: number | null;
+  platformFee?: number | null;
+  discount?: number | null;
+  totalAmount?: number | null;
+  deliveryAddress?: Record<string, unknown>;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export type CreateOrderResponse = {
+  order: ApiOrder;
+  items: Array<{
+    id: string;
+    orderId: string;
+    requestedName: string;
+    quantity: number;
+    unitPrice: number;
+    lineTotal: number;
+    requiresPrescription: boolean;
+  }>;
+};
 
 export function createOrder(payload: {
   customerId: string;
   items: CartEntry[];
+  deliveryAddress: CustomerAddress;
+  accessToken?: string;
 }) {
-  return apiRequest<ApiEnvelope<unknown>>('/orders', {
+  return apiRequest<ApiEnvelope<CreateOrderResponse>>('/orders', {
     method: 'POST',
     body: JSON.stringify({
       customerId: payload.customerId,
@@ -15,15 +48,7 @@ export function createOrder(payload: {
       deliveryFee: 25,
       platformFee: 5,
       discount: 0,
-      deliveryAddress: {
-        label: 'Home',
-        addressLine1: 'Koramangala 5th Block',
-        city: 'Bengaluru',
-        state: 'Karnataka',
-        pincode: '560095',
-        latitude: 12.9352,
-        longitude: 77.6245,
-      },
+      deliveryAddress: toDeliveryAddress(payload.deliveryAddress),
       items: payload.items.map((item) => ({
         medicineId: item.medicineId,
         requestedName: item.name,
@@ -32,5 +57,15 @@ export function createOrder(payload: {
         requiresPrescription: item.requiresPrescription,
       })),
     }),
+    accessToken: payload.accessToken,
   });
+}
+
+export function listCustomerOrders(customerId: string, accessToken?: string) {
+  return apiRequest<ApiEnvelope<ApiOrder[]>>(
+    `/orders?customerId=${encodeURIComponent(customerId)}&limit=25`,
+    {
+      accessToken,
+    },
+  );
 }

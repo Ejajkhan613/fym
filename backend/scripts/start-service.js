@@ -36,6 +36,7 @@ const SERVICE_FACTORIES = {
   order: {
     path: "../services/order-service/src",
     factory: "createOrderServiceApp",
+    serverFactory: "createOrderServiceServer",
     defaultPort: 4106,
   },
   matching: {
@@ -112,11 +113,45 @@ function createServiceApp(serviceName) {
   };
 }
 
-function startService(serviceName, options = {}) {
-  const { app, defaultPort } = createServiceApp(serviceName);
-  const port = Number(options.port || process.env.PORT || defaultPort);
+function createServiceRuntime(serviceName) {
+  const config = getServiceConfig(serviceName);
 
-  return app.listen(port, () => {
+  if (!config) {
+    const names = Object.keys(SERVICE_FACTORIES).sort().join(", ");
+    throw new Error(
+      `Unknown service "${serviceName}". Available services: ${names}`,
+    );
+  }
+
+  const serviceModule = require(config.path);
+  const runtimeFactoryName = config.serverFactory || config.factory;
+  const runtimeFactory = serviceModule[runtimeFactoryName];
+
+  if (typeof runtimeFactory !== "function") {
+    throw new Error(`Service factory ${runtimeFactoryName} was not exported`);
+  }
+
+  const runtime = runtimeFactory();
+
+  if (runtime && runtime.app) {
+    return {
+      ...runtime,
+      defaultPort: config.defaultPort,
+    };
+  }
+
+  return {
+    app: runtime,
+    defaultPort: config.defaultPort,
+  };
+}
+
+function startService(serviceName, options = {}) {
+  const { app, server, defaultPort } = createServiceRuntime(serviceName);
+  const port = Number(options.port || process.env.PORT || defaultPort);
+  const listener = server || app;
+
+  return listener.listen(port, () => {
     console.log(`${serviceName} listening on port ${port}`);
   });
 }
@@ -139,5 +174,6 @@ module.exports = {
   SERVICE_FACTORIES,
   getServiceConfig,
   createServiceApp,
+  createServiceRuntime,
   startService,
 };

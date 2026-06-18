@@ -12,6 +12,14 @@ class RealtimePublisher {
 
     if (this.io) {
       this.io.to(event.channel).emit(event.eventName, event.payload);
+      this.io.to(event.channel).emit("order.realtime", event);
+
+      if (event.aggregateId) {
+        this.io
+          .to(`order:${event.aggregateId}`)
+          .emit(event.eventName, event.payload);
+        this.io.to(`order:${event.aggregateId}`).emit("order.realtime", event);
+      }
     }
   }
 

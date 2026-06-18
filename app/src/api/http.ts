@@ -17,6 +17,24 @@ export class ApiError extends Error {
   }
 }
 
+function isNetworkFailure(error: unknown) {
+  return error instanceof TypeError || error instanceof Error;
+}
+
+async function fetchWithTimeout(url: string, options: RequestInit) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), env.apiTimeoutMs);
+
+  try {
+    return await fetch(url, {
+      ...options,
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 export async function apiRequest<TResponse>(path: string, options: RequestOptions = {}) {
   const { accessToken, headers, body, ...requestOptions } = options;
   const requestHeaders = new Headers(headers);
@@ -29,11 +47,31 @@ export async function apiRequest<TResponse>(path: string, options: RequestOption
     requestHeaders.set('Content-Type', 'application/json');
   }
 
-  const response = await fetch(`${env.apiBaseUrl}${path}`, {
-    ...requestOptions,
-    body,
-    headers: requestHeaders,
-  });
+  const networkErrors: string[] = [];
+  let response: Response | undefined;
+
+  for (const apiBaseUrl of env.apiBaseUrls) {
+    try {
+      response = await fetchWithTimeout(`${apiBaseUrl}${path}`, {
+        ...requestOptions,
+        body,
+        headers: requestHeaders,
+      });
+      break;
+    } catch (error) {
+      if (!isNetworkFailure(error)) {
+        throw error;
+      }
+
+      networkErrors.push(
+        `${apiBaseUrl}: ${error instanceof Error ? error.message : 'network request failed'}`,
+      );
+    }
+  }
+
+  if (!response) {
+    throw new Error(`Backend is unreachable. Tried ${networkErrors.join('; ')}`);
+  }
 
   if (!response.ok) {
     throw new ApiError(response.status, await parseErrorBody(response));

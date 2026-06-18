@@ -146,6 +146,12 @@ class OrderService {
   }
 
   async listPharmacyOffers(filters) {
+    const expired = await this.orderModel.expirePharmacyOffers(
+      filters.pharmacyId,
+    );
+
+    publishEvents(this.realtimePublisher, expired.realtimeEvents);
+
     return this.orderModel.listPharmacyOffers({
       pharmacyId: filters.pharmacyId,
       status: filters.status,
@@ -168,19 +174,15 @@ class OrderService {
   }
 
   async viewOffer(orderId, pharmacyId) {
-    const offer = await this.orderModel.markOfferViewed(orderId, pharmacyId);
+    const result = await this.orderModel.markOfferViewed(orderId, pharmacyId);
 
-    if (!offer) {
+    if (!result) {
       throw createError(404, "Order offer not found");
     }
 
-    this.realtimePublisher.publish({
-      eventName: orderEvents.VENDOR_OFFER_VIEWED,
-      channel: `pharmacy:${pharmacyId}`,
-      payload: { offer },
-    });
+    publishEvents(this.realtimePublisher, result.realtimeEvents);
 
-    return offer;
+    return result.offer;
   }
 
   async acceptOffer(orderId, input) {
@@ -198,6 +200,7 @@ class OrderService {
       }
 
       if (result.outcome === "OFFER_EXPIRED") {
+        publishEvents(this.realtimePublisher, result.realtimeEvents);
         throw createError(409, "Order offer has expired");
       }
 
@@ -206,6 +209,7 @@ class OrderService {
       }
 
       if (result.outcome === "ORDER_ALREADY_ASSIGNED") {
+        publishEvents(this.realtimePublisher, result.realtimeEvents);
         throw createError(409, "Order is already assigned to another pharmacy");
       }
 
@@ -221,23 +225,19 @@ class OrderService {
   }
 
   async rejectOffer(orderId, input) {
-    const offer = await this.orderModel.rejectOffer(
+    const result = await this.orderModel.rejectOffer(
       orderId,
       input.pharmacyId,
       input.reason,
     );
 
-    if (!offer) {
+    if (!result) {
       throw createError(404, "Order offer not found");
     }
 
-    this.realtimePublisher.publish({
-      eventName: orderEvents.VENDOR_REJECTED,
-      channel: `pharmacy:${input.pharmacyId}`,
-      payload: { offer },
-    });
+    publishEvents(this.realtimePublisher, result.realtimeEvents);
 
-    return offer;
+    return result.offer;
   }
 
   async markPacking(orderId, input) {

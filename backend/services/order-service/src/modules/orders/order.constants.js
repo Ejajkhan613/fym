@@ -47,6 +47,8 @@ const orderEvents = {
   ORDER_CREATED: "OrderCreated",
   VENDOR_OFFER_SENT: "VendorOfferSent",
   VENDOR_OFFER_VIEWED: "VendorOfferViewed",
+  VENDOR_OFFER_CLOSED: "VendorOfferClosed",
+  VENDOR_OFFER_EXPIRED: "VendorOfferExpired",
   VENDOR_ACCEPTED: "VendorAccepted",
   VENDOR_REJECTED: "VendorRejected",
   ORDER_PACKING: "OrderPacking",

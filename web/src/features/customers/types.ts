@@ -9,10 +9,6 @@ export type CustomerProfile = {
   userId: string;
   dateOfBirth?: string | null;
   gender?: CustomerGender | null;
-  emergencyContactName?: string | null;
-  emergencyContactPhone?: string | null;
-  abhaIdOptional?: string | null;
-  metadata: Record<string, unknown>;
   createdAt?: string;
   updatedAt?: string;
 };
@@ -20,10 +16,6 @@ export type CustomerProfile = {
 export type UpsertCustomerProfilePayload = {
   dateOfBirth?: string;
   gender?: CustomerGender;
-  emergencyContactName?: string;
-  emergencyContactPhone?: string;
-  abhaIdOptional?: string;
-  metadata?: Record<string, unknown>;
 };
 
 export type CustomerAddress = {

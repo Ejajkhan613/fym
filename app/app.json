@@ -11,14 +11,21 @@
       "bundleIdentifier": "com.fym.customer",
       "infoPlist": {
         "NSCameraUsageDescription": "FYM uses the camera so customers can capture prescription photos.",
-        "NSPhotoLibraryUsageDescription": "FYM uses photo library access so customers can upload existing prescription images."
+        "NSPhotoLibraryUsageDescription": "FYM uses photo library access so customers can upload existing prescription images.",
+        "NSLocationWhenInUseUsageDescription": "FYM uses your location to attach GPS coordinates to saved delivery addresses.",
+        "NSAppTransportSecurity": {
+          "NSAllowsArbitraryLoads": true
+        }
       }
     },
     "android": {
       "package": "com.fym.customer",
+      "usesCleartextTraffic": true,
       "permissions": [
         "CAMERA",
-        "READ_MEDIA_IMAGES"
+        "READ_MEDIA_IMAGES",
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION"
       ],
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
@@ -37,7 +44,14 @@
           "photosPermission": "FYM uses photo library access so customers can upload prescription images."
         }
       ],
-      "expo-document-picker"
+      "expo-document-picker",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "FYM uses your location to attach GPS coordinates to saved delivery addresses."
+        }
+      ],
+      "@react-native-community/datetimepicker"
     ],
     "web": {
       "favicon": "./assets/favicon.png"

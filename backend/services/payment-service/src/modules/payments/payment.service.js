@@ -33,6 +33,10 @@ class PaymentService {
     return this.paymentModel.listForOrder(orderId);
   }
 
+  async listForCustomer(customerId) {
+    return this.paymentModel.listForCustomer(customerId);
+  }
+
   async authorize(id, input) {
     return this.setStatus(id, {
       status: "PAYMENT_AUTHORIZED",

@@ -83,6 +83,134 @@ class CustomerService {
     return address;
   }
 
+  async listFamilyProfiles(userId) {
+    await this.assertUserExists(userId);
+    return this.customerModel.listFamilyProfiles(userId);
+  }
+
+  async createFamilyProfile(userId, input) {
+    await this.assertUserExists(userId);
+
+    try {
+      return await this.customerModel.createFamilyProfile(userId, input);
+    } catch (error) {
+      this.rethrowKnownDatabaseError(error);
+      throw error;
+    }
+  }
+
+  async getFamilyProfile(userId, familyProfileId) {
+    await this.assertUserExists(userId);
+    const profile = await this.customerModel.findFamilyProfileById(
+      userId,
+      familyProfileId,
+    );
+    if (!profile) throw createError(404, "Family profile not found");
+    return profile;
+  }
+
+  async updateFamilyProfile(userId, familyProfileId, input) {
+    await this.getFamilyProfile(userId, familyProfileId);
+
+    try {
+      const profile = await this.customerModel.updateFamilyProfile(
+        userId,
+        familyProfileId,
+        input,
+      );
+      if (!profile) throw createError(404, "Family profile not found");
+      return profile;
+    } catch (error) {
+      this.rethrowKnownDatabaseError(error);
+      throw error;
+    }
+  }
+
+  async deleteFamilyProfile(userId, familyProfileId) {
+    await this.getFamilyProfile(userId, familyProfileId);
+    const profile = await this.customerModel.deleteFamilyProfile(
+      userId,
+      familyProfileId,
+    );
+    if (!profile) throw createError(404, "Family profile not found");
+    return profile;
+  }
+
+  async listMedicineReminders(userId) {
+    await this.assertUserExists(userId);
+    return this.customerModel.listMedicineReminders(userId);
+  }
+
+  async createMedicineReminder(userId, input) {
+    await this.assertUserExists(userId);
+    if (input.familyProfileId) {
+      await this.getFamilyProfile(userId, input.familyProfileId);
+    }
+
+    try {
+      return await this.customerModel.createMedicineReminder(userId, input);
+    } catch (error) {
+      this.rethrowKnownDatabaseError(error);
+      throw error;
+    }
+  }
+
+  async getMedicineReminder(userId, reminderId) {
+    await this.assertUserExists(userId);
+    const reminder = await this.customerModel.findMedicineReminderById(
+      userId,
+      reminderId,
+    );
+    if (!reminder) throw createError(404, "Medicine reminder not found");
+    return reminder;
+  }
+
+  async updateMedicineReminder(userId, reminderId, input) {
+    await this.getMedicineReminder(userId, reminderId);
+    if (input.familyProfileId) {
+      await this.getFamilyProfile(userId, input.familyProfileId);
+    }
+
+    try {
+      const reminder = await this.customerModel.updateMedicineReminder(
+        userId,
+        reminderId,
+        input,
+      );
+      if (!reminder) throw createError(404, "Medicine reminder not found");
+      return reminder;
+    } catch (error) {
+      this.rethrowKnownDatabaseError(error);
+      throw error;
+    }
+  }
+
+  async deleteMedicineReminder(userId, reminderId) {
+    await this.getMedicineReminder(userId, reminderId);
+    const reminder = await this.customerModel.deleteMedicineReminder(
+      userId,
+      reminderId,
+    );
+    if (!reminder) throw createError(404, "Medicine reminder not found");
+    return reminder;
+  }
+
+  async getPrivacySettings(userId) {
+    await this.assertUserExists(userId);
+    return this.customerModel.getPrivacySettings(userId);
+  }
+
+  async updatePrivacySettings(userId, input) {
+    await this.assertUserExists(userId);
+
+    try {
+      return await this.customerModel.updatePrivacySettings(userId, input);
+    } catch (error) {
+      this.rethrowKnownDatabaseError(error);
+      throw error;
+    }
+  }
+
   async assertUserExists(userId) {
     const user = await this.customerModel.findUserById(userId);
     if (!user) throw createError(404, "User not found");

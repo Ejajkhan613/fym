@@ -27,6 +27,13 @@ const REFUND_COLUMNS = `
   updated_at
 `;
 
+function qualifyColumns(columns, alias) {
+  return columns
+    .split(",")
+    .map((column) => `${alias}.${column.trim()}`)
+    .join(",\n  ");
+}
+
 function mapPaymentRow(row) {
   if (!row) return null;
   return {
@@ -123,6 +130,35 @@ class PaymentModel {
     );
 
     return result.rows.map(mapPaymentRow);
+  }
+
+  async listForCustomer(customerId) {
+    const paymentsResult = await this.pool.query(
+      `
+        SELECT ${PAYMENT_COLUMNS}
+        FROM payment_transactions
+        WHERE customer_id = $1
+        ORDER BY created_at DESC
+      `,
+      [customerId],
+    );
+
+    const refundsResult = await this.pool.query(
+      `
+        SELECT ${qualifyColumns(REFUND_COLUMNS, "r")}
+        FROM refunds r
+        INNER JOIN payment_transactions p
+          ON p.id = r.payment_transaction_id
+        WHERE p.customer_id = $1
+        ORDER BY r.created_at DESC
+      `,
+      [customerId],
+    );
+
+    return {
+      payments: paymentsResult.rows.map(mapPaymentRow),
+      refunds: refundsResult.rows.map(mapRefundRow),
+    };
   }
 
   async updateStatus(id, input) {

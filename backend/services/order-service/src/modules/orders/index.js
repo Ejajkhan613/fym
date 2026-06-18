@@ -2,6 +2,7 @@ const { OrderModel } = require("./order.model");
 const { OrderService } = require("./order.service");
 const { RealtimePublisher } = require("./realtime.publisher");
 const { createOrderRealtimeGateway } = require("./realtime.gateway");
+const { createRealtimeRoutes } = require("./realtime.routes");
 const {
   createOrderRoutes,
   createPharmacyOrderRoutes,
@@ -15,6 +16,7 @@ module.exports = {
   OrderService,
   RealtimePublisher,
   createOrderRealtimeGateway,
+  createRealtimeRoutes,
   createOrderRoutes,
   createPharmacyOrderRoutes,
   orderRouteErrorHandler,

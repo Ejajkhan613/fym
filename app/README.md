@@ -21,13 +21,23 @@ The app talks to the API gateway routes already defined in `backend`:
 - `POST /orders`
 - `POST /prescriptions/upload`
 
-Set the API gateway URL in `.env`:
+For local Expo development, set the backend gateway port in `.env`:
+
+```bash
+EXPO_PUBLIC_API_PORT=4000
+```
+
+When `EXPO_PUBLIC_API_BASE_URL` is not set, the app derives the host from the
+Expo dev server URL and connects to the backend gateway on that port. This works
+for common LAN, simulator, and emulator runs. If you need a fixed URL, set:
 
 ```bash
 EXPO_PUBLIC_API_BASE_URL=http://localhost:4000
 ```
 
-For Android emulator testing, use `http://10.0.2.2:4000`. For a physical phone, use your computer LAN IP.
+For Android emulator-only testing, `http://10.0.2.2:4000` is also valid. For a
+physical phone, use your computer LAN IP if automatic host detection is not
+available.
 
 ## Verification
 

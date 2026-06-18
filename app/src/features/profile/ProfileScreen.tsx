@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { ComponentType } from 'react';
+import type { ComponentType, Dispatch, SetStateAction } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -12,6 +12,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import * as Location from 'expo-location';
 import {
   ArrowLeft,
   Bell,
@@ -21,7 +22,6 @@ import {
   ClipboardList,
   Edit3,
   FileText,
-  HeartPulse,
   Home,
   IdCard,
   LockKeyhole,
@@ -36,24 +36,61 @@ import {
   Users,
   WalletCards,
 } from 'lucide-react-native';
+import DateTimePicker, {
+  DateTimePickerAndroid,
+  type DateTimePickerEvent,
+} from '@react-native-community/datetimepicker';
 import { AppButton } from '../../components/AppButton';
 import {
   createCustomerAddress,
+  createCustomerFamilyProfile,
+  createMedicineReminder,
   deleteCustomerAddress,
+  deleteCustomerFamilyProfile,
+  deleteMedicineReminder,
+  getPrivacySettings,
   getCustomerProfile,
   listCustomerAddresses,
+  listCustomerFamilyProfiles,
+  listMedicineReminders,
   setDefaultCustomerAddress,
   updateCustomerAddress,
+  updateCustomerFamilyProfile,
+  updateMedicineReminder,
+  updatePrivacySettings,
   upsertCustomerProfile,
 } from '../../api/customers';
 import { logout } from '../../api/auth';
+import { listNotifications } from '../../api/notifications';
+import { listCustomerPayments } from '../../api/payments';
+import { listPrescriptions } from '../../api/prescriptions';
+import { createSupportTicket, listSupportTickets } from '../../api/support';
 import { updateUser } from '../../api/users';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/metrics';
+import {
+  FamilyProfilesScreen,
+  MedicineRemindersScreen,
+  NotificationsScreen,
+  PaymentsRefundsScreen,
+  PrescriptionVaultScreen,
+  PrivacySecurityScreen,
+  SupportTicketsScreen,
+} from './ProfileFeatureScreens';
 import type {
   AuthSession,
   CustomerAddress,
+  CustomerFamilyProfile,
   CustomerGender,
+  CustomerNotification,
+  CustomerPaymentSummary,
+  CustomerPrivacySettings,
+  MedicineReminder,
+  PrescriptionRecord,
+  SupportTicket,
+  UpdatePrivacySettingsPayload,
+  UpsertCustomerFamilyProfilePayload,
+  UpsertMedicineReminderPayload,
   UpsertCustomerProfilePayload,
 } from '../../types/domain';
 
@@ -61,9 +98,23 @@ type ProfileScreenProps = {
   session: AuthSession;
   onSessionChange: (session: AuthSession) => void;
   onLogout: () => void;
+  onOpenPrescriptionUpload?: () => void;
+  addresses?: CustomerAddress[];
+  onAddressesChange?: Dispatch<SetStateAction<CustomerAddress[]>>;
 };
 
-type ProfilePanel = 'overview' | 'personal' | 'addresses' | 'addressForm';
+type ProfilePanel =
+  | 'overview'
+  | 'personal'
+  | 'addresses'
+  | 'addressForm'
+  | 'familyProfiles'
+  | 'prescriptionVault'
+  | 'medicineReminders'
+  | 'paymentsRefunds'
+  | 'supportTickets'
+  | 'notifications'
+  | 'privacySecurity';
 
 type IconProps = {
   color?: string;
@@ -83,14 +134,6 @@ type ProfileDraft = {
   name: string;
   dateOfBirth: string;
   gender: CustomerGender | '';
-  emergencyContactName: string;
-  emergencyContactPhone: string;
-  abhaIdOptional: string;
-  bloodGroup: string;
-  allergies: string;
-  chronicMedicines: string;
-  doctorName: string;
-  doctorPhone: string;
 };
 
 type AddressDraft = {
@@ -110,63 +153,92 @@ type AddressDraft = {
 const profileActions: ProfileAction[] = [
   {
     title: 'Personal details',
-    subtitle: 'Name, DOB, gender, ABHA, and emergency contact',
+    subtitle: 'Name, date of birth, and gender',
     Icon: UserRound,
     panel: 'personal',
-  },
-  {
-    title: 'Delivery addresses',
-    subtitle: 'Home, work, and saved recipients',
-    Icon: MapPin,
-    panel: 'addresses',
   },
   {
     title: 'Family profiles',
     subtitle: 'Manage prescriptions for family members',
     Icon: Users,
     tone: 'teal',
+    panel: 'familyProfiles',
   },
   {
     title: 'Prescription vault',
     subtitle: 'Uploaded and approved prescriptions',
     Icon: FileText,
+    panel: 'prescriptionVault',
   },
   {
     title: 'Medicine reminders',
     subtitle: 'Refill and dose reminders',
     Icon: Calendar,
     tone: 'warning',
+    panel: 'medicineReminders',
   },
   {
     title: 'Payments and refunds',
     subtitle: 'Wallet, cards, invoices, and refunds',
     Icon: WalletCards,
+    panel: 'paymentsRefunds',
   },
   {
     title: 'Support tickets',
     subtitle: 'Order help and pharmacist queries',
     Icon: ClipboardList,
+    panel: 'supportTickets',
   },
   {
     title: 'Notifications',
     subtitle: 'Order, offer, and reminder alerts',
     Icon: Bell,
+    panel: 'notifications',
   },
   {
     title: 'Privacy and security',
     subtitle: 'Data access, consent, and session safety',
     Icon: LockKeyhole,
+    panel: 'privacySecurity',
   },
 ];
 
-export function ProfileScreen({ session, onSessionChange, onLogout }: ProfileScreenProps) {
+export function ProfileScreen({
+  session,
+  onSessionChange,
+  onLogout,
+  onOpenPrescriptionUpload,
+  addresses: sharedAddresses,
+  onAddressesChange,
+}: ProfileScreenProps) {
   const [panel, setPanel] = useState<ProfilePanel>('overview');
   const [profileDraft, setProfileDraft] = useState(() => createInitialProfileDraft(session));
-  const [addresses, setAddresses] = useState<CustomerAddress[]>(() => [createFallbackAddress(session)]);
+  const [localAddresses, setLocalAddresses] = useState<CustomerAddress[]>(() => [
+    createFallbackAddress(session),
+  ]);
+  const [familyProfiles, setFamilyProfiles] = useState<CustomerFamilyProfile[]>([]);
+  const [medicineReminders, setMedicineReminders] = useState<MedicineReminder[]>([]);
+  const [prescriptions, setPrescriptions] = useState<PrescriptionRecord[]>([]);
+  const [paymentSummary, setPaymentSummary] = useState<CustomerPaymentSummary>({
+    payments: [],
+    refunds: [],
+  });
+  const [supportTickets, setSupportTickets] = useState<SupportTicket[]>([]);
+  const [notifications, setNotifications] = useState<CustomerNotification[]>([]);
+  const [privacySettings, setPrivacySettings] = useState(() =>
+    createDefaultPrivacySettings(session.user.id),
+  );
   const [editingAddress, setEditingAddress] = useState<CustomerAddress | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [isSavingAddress, setIsSavingAddress] = useState(false);
+  const [isSavingFeature, setIsSavingFeature] = useState(false);
+  const addresses = sharedAddresses || localAddresses;
+
+  function setAddresses(updater: SetStateAction<CustomerAddress[]>) {
+    setLocalAddresses(updater);
+    onAddressesChange?.(updater);
+  }
 
   const defaultAddress = useMemo(
     () => addresses.find((address) => address.isDefault) || addresses[0],
@@ -183,9 +255,26 @@ export function ProfileScreen({ session, onSessionChange, onLogout }: ProfileScr
     async function loadCustomerDetails() {
       setIsSyncing(true);
 
-      const [profileResult, addressesResult] = await Promise.allSettled([
+      const [
+        profileResult,
+        addressesResult,
+        familyProfilesResult,
+        remindersResult,
+        prescriptionsResult,
+        paymentsResult,
+        supportResult,
+        notificationsResult,
+        privacyResult,
+      ] = await Promise.allSettled([
         getCustomerProfile(session.user.id, session.tokens.accessToken),
         listCustomerAddresses(session.user.id, session.tokens.accessToken),
+        listCustomerFamilyProfiles(session.user.id, session.tokens.accessToken),
+        listMedicineReminders(session.user.id, session.tokens.accessToken),
+        listPrescriptions(session.user.id, session.tokens.accessToken),
+        listCustomerPayments(session.user.id, session.tokens.accessToken),
+        listSupportTickets(session.user.id, session.tokens.accessToken),
+        listNotifications(session.user.id, session.tokens.accessToken),
+        getPrivacySettings(session.user.id, session.tokens.accessToken),
       ]);
 
       if (!mounted) {
@@ -198,6 +287,34 @@ export function ProfileScreen({ session, onSessionChange, onLogout }: ProfileScr
 
       if (addressesResult.status === 'fulfilled' && addressesResult.value.data.length > 0) {
         setAddresses(addressesResult.value.data);
+      }
+
+      if (familyProfilesResult.status === 'fulfilled') {
+        setFamilyProfiles(familyProfilesResult.value.data);
+      }
+
+      if (remindersResult.status === 'fulfilled') {
+        setMedicineReminders(remindersResult.value.data);
+      }
+
+      if (prescriptionsResult.status === 'fulfilled') {
+        setPrescriptions(prescriptionsResult.value.data);
+      }
+
+      if (paymentsResult.status === 'fulfilled') {
+        setPaymentSummary(paymentsResult.value.data);
+      }
+
+      if (supportResult.status === 'fulfilled') {
+        setSupportTickets(supportResult.value.data);
+      }
+
+      if (notificationsResult.status === 'fulfilled') {
+        setNotifications(notificationsResult.value.data);
+      }
+
+      if (privacyResult.status === 'fulfilled') {
+        setPrivacySettings(privacyResult.value.data);
       }
 
       setIsSyncing(false);
@@ -253,7 +370,7 @@ export function ProfileScreen({ session, onSessionChange, onLogout }: ProfileScr
         nextSession.tokens.accessToken,
       );
 
-      Alert.alert('Profile updated', 'Your personal and medical safety details were saved.');
+      Alert.alert('Profile updated', 'Your personal details were saved.');
       setPanel('overview');
     } catch (error) {
       Alert.alert(
@@ -379,6 +496,151 @@ export function ProfileScreen({ session, onSessionChange, onLogout }: ProfileScr
     }
   }
 
+  async function handleSaveFamilyProfile(
+    familyProfileId: string | null,
+    payload: UpsertCustomerFamilyProfilePayload,
+  ) {
+    setIsSavingFeature(true);
+
+    try {
+      const response = familyProfileId
+        ? await updateCustomerFamilyProfile(
+            session.user.id,
+            familyProfileId,
+            payload,
+            session.tokens.accessToken,
+          )
+        : await createCustomerFamilyProfile(session.user.id, payload, session.tokens.accessToken);
+
+      setFamilyProfiles((current) =>
+        familyProfileId
+          ? current.map((profile) => (profile.id === familyProfileId ? response.data : profile))
+          : [response.data, ...current],
+      );
+    } catch (error) {
+      Alert.alert('Could not save family profile', getErrorMessage(error));
+      throw error;
+    } finally {
+      setIsSavingFeature(false);
+    }
+  }
+
+  async function handleDeleteFamilyProfile(profile: CustomerFamilyProfile) {
+    setFamilyProfiles((current) => current.filter((item) => item.id !== profile.id));
+
+    try {
+      await deleteCustomerFamilyProfile(session.user.id, profile.id, session.tokens.accessToken);
+    } catch (error) {
+      setFamilyProfiles((current) => [profile, ...current]);
+      Alert.alert('Could not delete family profile', getErrorMessage(error));
+    }
+  }
+
+  async function handleSaveMedicineReminder(
+    reminderId: string | null,
+    payload: UpsertMedicineReminderPayload,
+  ) {
+    setIsSavingFeature(true);
+
+    try {
+      const response = reminderId
+        ? await updateMedicineReminder(
+            session.user.id,
+            reminderId,
+            payload,
+            session.tokens.accessToken,
+          )
+        : await createMedicineReminder(session.user.id, payload, session.tokens.accessToken);
+
+      setMedicineReminders((current) =>
+        reminderId
+          ? current.map((reminder) => (reminder.id === reminderId ? response.data : reminder))
+          : [response.data, ...current],
+      );
+    } catch (error) {
+      Alert.alert('Could not save reminder', getErrorMessage(error));
+      throw error;
+    } finally {
+      setIsSavingFeature(false);
+    }
+  }
+
+  async function handleDeleteMedicineReminder(reminder: MedicineReminder) {
+    setMedicineReminders((current) => current.filter((item) => item.id !== reminder.id));
+
+    try {
+      await deleteMedicineReminder(session.user.id, reminder.id, session.tokens.accessToken);
+    } catch (error) {
+      setMedicineReminders((current) => [reminder, ...current]);
+      Alert.alert('Could not delete reminder', getErrorMessage(error));
+    }
+  }
+
+  async function handleCreateSupportTicket(payload: {
+    category: string;
+    subject: string;
+    description: string;
+    attachments: Array<{
+      name: string;
+      uri: string;
+      size?: number;
+      mimeType?: string;
+    }>;
+  }) {
+    setIsSavingFeature(true);
+
+    try {
+      const response = await createSupportTicket(
+        {
+          customerId: session.user.id,
+          category: payload.category,
+          subject: payload.subject,
+          description: payload.description,
+          ...(payload.attachments.length > 0
+            ? {
+                metadata: {
+                  attachments: payload.attachments.map((attachment) => ({
+                    name: attachment.name,
+                    uri: attachment.uri,
+                    size: attachment.size,
+                    mimeType: attachment.mimeType,
+                  })),
+                },
+              }
+            : {}),
+        },
+        session.tokens.accessToken,
+      );
+
+      setSupportTickets((current) => [response.data.ticket, ...current]);
+    } catch (error) {
+      Alert.alert('Could not create ticket', getErrorMessage(error));
+      throw error;
+    } finally {
+      setIsSavingFeature(false);
+    }
+  }
+
+  async function handleUpdatePrivacySetting(
+    key: keyof UpdatePrivacySettingsPayload,
+    value: boolean,
+  ) {
+    const nextSettings = { ...privacySettings, [key]: value };
+    setPrivacySettings(nextSettings);
+
+    try {
+      const response = await updatePrivacySettings(
+        session.user.id,
+        { [key]: value },
+        session.tokens.accessToken,
+      );
+      setPrivacySettings(response.data);
+    } catch (error) {
+      setPrivacySettings(privacySettings);
+      Alert.alert('Could not update setting', getErrorMessage(error));
+    }
+  }
+
   if (panel === 'personal') {
     return (
       <PersonalDetailsScreen
@@ -415,12 +677,91 @@ export function ProfileScreen({ session, onSessionChange, onLogout }: ProfileScr
       <AddressFormScreen
         address={editingAddress}
         session={session}
+        gpsEnabled={privacySettings.gpsForAddressesEnabled}
         onBack={() => {
           setEditingAddress(null);
           setPanel('addresses');
         }}
         onSave={handleSaveAddress}
         isSaving={isSavingAddress}
+      />
+    );
+  }
+
+  if (panel === 'familyProfiles') {
+    return (
+      <FamilyProfilesScreen
+        profiles={familyProfiles}
+        onBack={() => setPanel('overview')}
+        onSave={handleSaveFamilyProfile}
+        onDelete={handleDeleteFamilyProfile}
+        isSaving={isSavingFeature}
+      />
+    );
+  }
+
+  if (panel === 'prescriptionVault') {
+    return (
+      <PrescriptionVaultScreen
+        prescriptions={prescriptions}
+        onBack={() => setPanel('overview')}
+        onUploadPrescription={onOpenPrescriptionUpload}
+      />
+    );
+  }
+
+  if (panel === 'medicineReminders') {
+    return (
+      <MedicineRemindersScreen
+        reminders={medicineReminders}
+        familyProfiles={familyProfiles}
+        onBack={() => setPanel('overview')}
+        onSave={handleSaveMedicineReminder}
+        onDelete={handleDeleteMedicineReminder}
+        isSaving={isSavingFeature}
+      />
+    );
+  }
+
+  if (panel === 'paymentsRefunds') {
+    return (
+      <PaymentsRefundsScreen
+        summary={paymentSummary}
+        onBack={() => setPanel('overview')}
+      />
+    );
+  }
+
+  if (panel === 'supportTickets') {
+    return (
+      <SupportTicketsScreen
+        tickets={supportTickets}
+        onBack={() => setPanel('overview')}
+        onCreate={handleCreateSupportTicket}
+        isSaving={isSavingFeature}
+      />
+    );
+  }
+
+  if (panel === 'notifications') {
+    return (
+      <NotificationsScreen
+        notifications={notifications}
+        settings={privacySettings}
+        onBack={() => setPanel('overview')}
+        onTogglePreference={handleUpdatePrivacySetting}
+      />
+    );
+  }
+
+  if (panel === 'privacySecurity') {
+    return (
+      <PrivacySecurityScreen
+        session={session}
+        settings={privacySettings}
+        onBack={() => setPanel('overview')}
+        onTogglePreference={handleUpdatePrivacySetting}
+        onLogout={handleLogout}
       />
     );
   }
@@ -486,7 +827,7 @@ export function ProfileScreen({ session, onSessionChange, onLogout }: ProfileScr
             label="Addresses"
           />
           <SummaryTile
-            value="2"
+            value={String(familyProfiles.length)}
             label="Family"
           />
         </View>
@@ -511,27 +852,6 @@ export function ProfileScreen({ session, onSessionChange, onLogout }: ProfileScr
           <ChevronRight color={colors.muted} size={23} strokeWidth={2.2} />
         </Pressable>
 
-        <Pressable
-          accessibilityRole="button"
-          onPress={() => setPanel('personal')}
-          style={styles.safetyCard}
-        >
-          <View style={styles.safetyIcon}>
-            <HeartPulse color={colors.teal} size={30} strokeWidth={2.3} />
-          </View>
-          <View style={styles.safetyCopy}>
-            <Text style={styles.safetyTitle}>Health profile</Text>
-            <Text style={styles.safetyText}>
-              {profileDraft.allergies || profileDraft.chronicMedicines
-                ? 'Allergy and chronic medicine notes are saved.'
-                : 'Add allergies, chronic medicines, and emergency contact details.'}
-            </Text>
-          </View>
-          <View style={styles.completionBadge}>
-            <Text style={styles.completionText}>{completion}%</Text>
-          </View>
-        </Pressable>
-
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Account</Text>
           <Text style={styles.sectionHint}>Manage</Text>
@@ -547,8 +867,6 @@ export function ProfileScreen({ session, onSessionChange, onLogout }: ProfileScr
                   setPanel(action.panel);
                   return;
                 }
-
-                Alert.alert(action.title, action.subtitle);
               }}
             />
           ))}
@@ -625,12 +943,9 @@ function PersonalDetailsScreen({
 
         <View style={styles.formSection}>
           <Text style={styles.formSectionTitle}>Basic details</Text>
-          <FormField
-            label="Date of birth"
+          <DateOfBirthField
             value={draft.dateOfBirth}
-            onChangeText={(value) => updateDraft('dateOfBirth', value)}
-            placeholder="YYYY-MM-DD"
-            keyboardType="numbers-and-punctuation"
+            onChange={(value) => updateDraft('dateOfBirth', value)}
           />
           <Text style={styles.inputLabel}>Gender</Text>
           <View style={styles.segmentRow}>
@@ -655,63 +970,8 @@ function PersonalDetailsScreen({
               </Pressable>
             ))}
           </View>
-          <FormField
-            label="ABHA ID"
-            value={draft.abhaIdOptional}
-            onChangeText={(value) => updateDraft('abhaIdOptional', value)}
-            placeholder="Optional"
-          />
         </View>
 
-        <View style={styles.formSection}>
-          <Text style={styles.formSectionTitle}>Emergency and medical safety</Text>
-          <FormField
-            label="Emergency contact name"
-            value={draft.emergencyContactName}
-            onChangeText={(value) => updateDraft('emergencyContactName', value)}
-            placeholder="Name"
-          />
-          <FormField
-            label="Emergency contact phone"
-            value={draft.emergencyContactPhone}
-            onChangeText={(value) => updateDraft('emergencyContactPhone', value)}
-            placeholder="+91..."
-            keyboardType="phone-pad"
-          />
-          <FormField
-            label="Blood group"
-            value={draft.bloodGroup}
-            onChangeText={(value) => updateDraft('bloodGroup', value)}
-            placeholder="E.g. B+"
-          />
-          <FormField
-            label="Known allergies"
-            value={draft.allergies}
-            onChangeText={(value) => updateDraft('allergies', value)}
-            placeholder="E.g. Penicillin, aspirin"
-            multiline
-          />
-          <FormField
-            label="Chronic medicines"
-            value={draft.chronicMedicines}
-            onChangeText={(value) => updateDraft('chronicMedicines', value)}
-            placeholder="E.g. Metformin 500mg daily"
-            multiline
-          />
-          <FormField
-            label="Preferred doctor"
-            value={draft.doctorName}
-            onChangeText={(value) => updateDraft('doctorName', value)}
-            placeholder="Doctor name"
-          />
-          <FormField
-            label="Doctor phone"
-            value={draft.doctorPhone}
-            onChangeText={(value) => updateDraft('doctorPhone', value)}
-            placeholder="Optional"
-            keyboardType="phone-pad"
-          />
-        </View>
       </ScrollView>
       <View style={styles.stickyFooter}>
         <AppButton
@@ -821,20 +1081,79 @@ function AddressListScreen({
 function AddressFormScreen({
   address,
   session,
+  gpsEnabled,
   onBack,
   onSave,
   isSaving,
 }: {
   address: CustomerAddress | null;
   session: AuthSession;
+  gpsEnabled: boolean;
   onBack: () => void;
   onSave: (draft: AddressDraft) => void;
   isSaving: boolean;
 }) {
   const [draft, setDraft] = useState(() => createAddressDraft(session, address));
+  const [isLocating, setIsLocating] = useState(false);
 
   function updateDraft(key: keyof AddressDraft, value: string | boolean) {
     setDraft((current) => ({ ...current, [key]: value }));
+  }
+
+  async function captureCurrentLocation(showSuccess = true) {
+    if (!gpsEnabled) {
+      Alert.alert(
+        'GPS disabled',
+        'Enable GPS for addresses in Privacy and Security to attach delivery coordinates.',
+      );
+      return draft;
+    }
+
+    setIsLocating(true);
+
+    try {
+      const permission = await Location.requestForegroundPermissionsAsync();
+
+      if (permission.status !== 'granted') {
+        Alert.alert(
+          'Location permission needed',
+          'Allow location access so FYM can attach GPS coordinates to this address.',
+        );
+        return draft;
+      }
+
+      const position = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      });
+      const nextDraft = {
+        ...draft,
+        latitude: position.coords.latitude.toFixed(7),
+        longitude: position.coords.longitude.toFixed(7),
+      };
+
+      setDraft(nextDraft);
+
+      if (showSuccess) {
+        Alert.alert('GPS location added', 'Current device location is attached to this address.');
+      }
+
+      return nextDraft;
+    } catch (error) {
+      Alert.alert('Could not get location', getErrorMessage(error));
+      return draft;
+    } finally {
+      setIsLocating(false);
+    }
+  }
+
+  async function handleSavePress() {
+    let nextDraft = draft;
+
+    if (!draft.latitude || !draft.longitude) {
+      nextDraft = await captureCurrentLocation(false);
+    }
+
+    onSave(nextDraft);
   }
 
   return (
@@ -916,27 +1235,28 @@ function AddressFormScreen({
         </View>
 
         <View style={styles.formSection}>
-          <Text style={styles.formSectionTitle}>Optional geo coordinates</Text>
-          <View style={styles.twoColumnRow}>
-            <View style={styles.column}>
-              <FormField
-                label="Latitude"
-                value={draft.latitude}
-                onChangeText={(value) => updateDraft('latitude', value)}
-                placeholder="12.9352"
-                keyboardType="numbers-and-punctuation"
-              />
-            </View>
-            <View style={styles.column}>
-              <FormField
-                label="Longitude"
-                value={draft.longitude}
-                onChangeText={(value) => updateDraft('longitude', value)}
-                placeholder="77.6245"
-                keyboardType="numbers-and-punctuation"
-              />
-            </View>
-          </View>
+          <Text style={styles.formSectionTitle}>GPS delivery point</Text>
+          <Text style={styles.gpsHelpText}>
+            FYM uses your phone location to attach delivery coordinates. Coordinates are not typed manually.
+          </Text>
+          <Pressable
+            accessibilityRole="button"
+            disabled={isLocating}
+            onPress={() => captureCurrentLocation()}
+            style={[styles.gpsButton, isLocating ? styles.gpsButtonDisabled : null]}
+          >
+            <MapPin color={colors.primary} size={20} strokeWidth={2.4} />
+            <Text style={styles.gpsButtonText}>
+              {isLocating ? 'Getting location...' : 'Use current GPS location'}
+            </Text>
+          </Pressable>
+          {draft.latitude && draft.longitude ? (
+            <Text style={styles.gpsCoordinates}>
+              Attached: {draft.latitude}, {draft.longitude}
+            </Text>
+          ) : (
+            <Text style={styles.gpsCoordinates}>No GPS point attached yet.</Text>
+          )}
           <Pressable
             accessibilityRole="checkbox"
             accessibilityState={{ checked: draft.isDefault }}
@@ -953,7 +1273,7 @@ function AddressFormScreen({
       <View style={styles.stickyFooter}>
         <AppButton
           label={address ? 'Save Address' : 'Add Address'}
-          onPress={() => onSave(draft)}
+          onPress={handleSavePress}
           loading={isSaving}
           icon={<Save color="#FFFFFF" size={22} strokeWidth={2.3} />}
         />
@@ -984,6 +1304,83 @@ function ScreenHeader({
         <Text style={styles.subHeaderTitle}>{title}</Text>
         <Text style={styles.subHeaderSubtitle}>{subtitle}</Text>
       </View>
+    </View>
+  );
+}
+
+function DateOfBirthField({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const [showInlinePicker, setShowInlinePicker] = useState(false);
+  const selectedDate = parseDateInput(value) || getDefaultBirthDate();
+  const maximumDate = startOfDay(new Date());
+
+  function handleTypedDate(nextValue: string) {
+    onChange(nextValue);
+  }
+
+  function handlePickerChange(event: DateTimePickerEvent, nextDate?: Date) {
+    if (Platform.OS !== 'ios') {
+      setShowInlinePicker(false);
+    }
+
+    if (event.type === 'dismissed' || !nextDate) {
+      return;
+    }
+
+    onChange(formatDateInput(nextDate));
+  }
+
+  function openPicker() {
+    if (Platform.OS === 'android') {
+      DateTimePickerAndroid.open({
+        value: selectedDate,
+        mode: 'date',
+        display: 'calendar',
+        maximumDate,
+        onChange: handlePickerChange,
+      });
+      return;
+    }
+
+    setShowInlinePicker((current) => !current);
+  }
+
+  return (
+    <View style={styles.fieldGroup}>
+      <Text style={styles.inputLabel}>Date of birth</Text>
+      <View style={styles.inputWrap}>
+        <Calendar color={colors.muted} size={22} strokeWidth={2.2} />
+        <TextInput
+          value={value}
+          onChangeText={handleTypedDate}
+          placeholder="YYYY-MM-DD"
+          placeholderTextColor="#8D8F97"
+          keyboardType="numbers-and-punctuation"
+          style={styles.textInput}
+        />
+        <Pressable
+          accessibilityRole="button"
+          onPress={openPicker}
+          style={styles.datePickerButton}
+        >
+          <Text style={styles.datePickerButtonText}>Pick</Text>
+        </Pressable>
+      </View>
+
+      {showInlinePicker ? (
+        <DateTimePicker
+          display="inline"
+          maximumDate={maximumDate}
+          mode="date"
+          onChange={handlePickerChange}
+          value={selectedDate}
+        />
+      ) : null}
     </View>
   );
 }
@@ -1119,14 +1516,21 @@ function createInitialProfileDraft(session: AuthSession): ProfileDraft {
     name: session.user.name || '',
     dateOfBirth: '',
     gender: '',
-    emergencyContactName: '',
-    emergencyContactPhone: '',
-    abhaIdOptional: '',
-    bloodGroup: '',
-    allergies: '',
-    chronicMedicines: '',
-    doctorName: '',
-    doctorPhone: '',
+  };
+}
+
+function createDefaultPrivacySettings(userId: string): CustomerPrivacySettings {
+  return {
+    userId,
+    pushNotificationsEnabled: true,
+    smsNotificationsEnabled: true,
+    orderUpdatesEnabled: true,
+    prescriptionUpdatesEnabled: true,
+    supportUpdatesEnabled: true,
+    medicineRemindersEnabled: true,
+    promotionalOffersEnabled: false,
+    dataSharingConsent: false,
+    gpsForAddressesEnabled: true,
   };
 }
 
@@ -1135,26 +1539,12 @@ function createProfileDraftFromApi(
   profile: {
     dateOfBirth?: string | null;
     gender?: CustomerGender | null;
-    emergencyContactName?: string | null;
-    emergencyContactPhone?: string | null;
-    abhaIdOptional?: string | null;
-    metadata?: Record<string, unknown>;
   },
 ): ProfileDraft {
-  const metadata = profile.metadata || {};
-
   return {
     name: session.user.name || '',
     dateOfBirth: normalizeDate(profile.dateOfBirth),
     gender: profile.gender || '',
-    emergencyContactName: profile.emergencyContactName || '',
-    emergencyContactPhone: profile.emergencyContactPhone || '',
-    abhaIdOptional: profile.abhaIdOptional || '',
-    bloodGroup: readMetadataString(metadata, 'bloodGroup'),
-    allergies: readMetadataString(metadata, 'allergies'),
-    chronicMedicines: readMetadataString(metadata, 'chronicMedicines'),
-    doctorName: readMetadataString(metadata, 'doctorName'),
-    doctorPhone: readMetadataString(metadata, 'doctorPhone'),
   };
 }
 
@@ -1249,20 +1639,6 @@ function buildProfilePayload(draft: ProfileDraft): UpsertCustomerProfilePayload 
   return {
     ...(draft.dateOfBirth.trim() ? { dateOfBirth: draft.dateOfBirth.trim() } : {}),
     ...(draft.gender ? { gender: draft.gender } : {}),
-    ...(draft.emergencyContactName.trim()
-      ? { emergencyContactName: draft.emergencyContactName.trim() }
-      : {}),
-    ...(draft.emergencyContactPhone.trim()
-      ? { emergencyContactPhone: draft.emergencyContactPhone.trim() }
-      : {}),
-    ...(draft.abhaIdOptional.trim() ? { abhaIdOptional: draft.abhaIdOptional.trim() } : {}),
-    metadata: compactObject({
-      bloodGroup: draft.bloodGroup,
-      allergies: draft.allergies,
-      chronicMedicines: draft.chronicMedicines,
-      doctorName: draft.doctorName,
-      doctorPhone: draft.doctorPhone,
-    }),
   };
 }
 
@@ -1288,16 +1664,16 @@ function validateProfileDraft(draft: ProfileDraft) {
     return 'Full name is required.';
   }
 
-  if (draft.dateOfBirth.trim() && !/^\d{4}-\d{2}-\d{2}$/.test(draft.dateOfBirth.trim())) {
-    return 'Date of birth must use YYYY-MM-DD format.';
-  }
+  if (draft.dateOfBirth.trim()) {
+    const parsedDate = parseDateInput(draft.dateOfBirth);
 
-  if (draft.emergencyContactPhone.trim() && draft.emergencyContactPhone.trim().length < 7) {
-    return 'Emergency contact phone must be valid.';
-  }
+    if (!parsedDate) {
+      return 'Date of birth must be a valid date in YYYY-MM-DD format.';
+    }
 
-  if (draft.doctorPhone.trim() && draft.doctorPhone.trim().length < 7) {
-    return 'Doctor phone must be valid.';
+    if (parsedDate.getTime() > startOfDay(new Date()).getTime()) {
+      return 'Date of birth cannot be in the future.';
+    }
   }
 
   return null;
@@ -1344,9 +1720,6 @@ function calculateProfileCompletion(draft: ProfileDraft, addresses: CustomerAddr
     draft.name.trim(),
     draft.dateOfBirth.trim(),
     draft.gender,
-    draft.emergencyContactName.trim(),
-    draft.emergencyContactPhone.trim(),
-    draft.allergies.trim() || draft.chronicMedicines.trim(),
     addresses.length > 0,
     addresses.some((address) => address.isDefault),
   ];
@@ -1397,19 +1770,6 @@ function getTone(tone: ProfileAction['tone']) {
   };
 }
 
-function readMetadataString(metadata: Record<string, unknown>, key: string) {
-  const value = metadata[key];
-  return typeof value === 'string' ? value : '';
-}
-
-function compactObject(values: Record<string, string>) {
-  return Object.fromEntries(
-    Object.entries(values)
-      .map(([key, value]) => [key, value.trim()])
-      .filter(([, value]) => Boolean(value)),
-  );
-}
-
 function normalizeDate(value?: string | null) {
   if (!value) {
     return '';
@@ -1418,12 +1778,52 @@ function normalizeDate(value?: string | null) {
   return value.slice(0, 10);
 }
 
+function parseDateInput(value: string) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value.trim());
+
+  if (!match) {
+    return null;
+  }
+
+  const year = Number(match[1]);
+  const month = Number(match[2]) - 1;
+  const day = Number(match[3]);
+  const date = new Date(year, month, day);
+
+  if (date.getFullYear() !== year || date.getMonth() !== month || date.getDate() !== day) {
+    return null;
+  }
+
+  return date;
+}
+
+function getDefaultBirthDate() {
+  const today = new Date();
+  return new Date(today.getFullYear() - 25, today.getMonth(), today.getDate());
+}
+
+function startOfDay(date: Date) {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
+function formatDateInput(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+
+  return `${year}-${month}-${day}`;
+}
+
 function trimmedOrNull(value: string) {
   return value.trim() || null;
 }
 
 function parseOptionalNumber(value: string) {
   return value.trim() ? Number(value) : null;
+}
+
+function getErrorMessage(error: unknown) {
+  return error instanceof Error ? error.message : 'Please try again.';
 }
 
 function formatAddress(address: CustomerAddress) {
@@ -1862,6 +2262,51 @@ const styles = StyleSheet.create({
   segmentTextActive: {
     color: colors.primary,
     fontWeight: '900',
+  },
+  datePickerButton: {
+    minHeight: 38,
+    borderRadius: 999,
+    backgroundColor: colors.primarySoft,
+    paddingHorizontal: 13,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  datePickerButtonText: {
+    color: colors.primary,
+    fontSize: 14,
+    fontWeight: '900',
+  },
+  gpsHelpText: {
+    color: colors.muted,
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: '600',
+  },
+  gpsButton: {
+    minHeight: 52,
+    borderRadius: 17,
+    borderWidth: 1,
+    borderColor: '#C9DDFF',
+    backgroundColor: colors.primarySofter,
+    paddingHorizontal: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  gpsButtonDisabled: {
+    opacity: 0.7,
+  },
+  gpsButtonText: {
+    color: colors.primary,
+    fontSize: 15,
+    fontWeight: '900',
+  },
+  gpsCoordinates: {
+    color: colors.muted,
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: '700',
   },
   stickyFooter: {
     position: 'absolute',
