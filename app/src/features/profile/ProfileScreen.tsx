@@ -40,37 +40,33 @@ import DateTimePicker, {
   DateTimePickerAndroid,
   type DateTimePickerEvent,
 } from '@react-native-community/datetimepicker';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppButton } from '../../components/AppButton';
 import {
   createCustomerAddress,
   createCustomerFamilyProfile,
-  createMedicineReminder,
   deleteCustomerAddress,
   deleteCustomerFamilyProfile,
-  deleteMedicineReminder,
   getPrivacySettings,
   getCustomerProfile,
   listCustomerAddresses,
   listCustomerFamilyProfiles,
-  listMedicineReminders,
   setDefaultCustomerAddress,
   updateCustomerAddress,
   updateCustomerFamilyProfile,
-  updateMedicineReminder,
   updatePrivacySettings,
   upsertCustomerProfile,
 } from '../../api/customers';
 import { logout } from '../../api/auth';
 import { listNotifications } from '../../api/notifications';
 import { listCustomerPayments } from '../../api/payments';
-import { listPrescriptions } from '../../api/prescriptions';
+import { deletePrescription, listPrescriptions } from '../../api/prescriptions';
 import { createSupportTicket, listSupportTickets } from '../../api/support';
 import { updateUser } from '../../api/users';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/metrics';
 import {
   FamilyProfilesScreen,
-  MedicineRemindersScreen,
   NotificationsScreen,
   PaymentsRefundsScreen,
   PrescriptionVaultScreen,
@@ -85,12 +81,10 @@ import type {
   CustomerNotification,
   CustomerPaymentSummary,
   CustomerPrivacySettings,
-  MedicineReminder,
   PrescriptionRecord,
   SupportTicket,
   UpdatePrivacySettingsPayload,
   UpsertCustomerFamilyProfilePayload,
-  UpsertMedicineReminderPayload,
   UpsertCustomerProfilePayload,
 } from '../../types/domain';
 
@@ -99,6 +93,8 @@ type ProfileScreenProps = {
   onSessionChange: (session: AuthSession) => void;
   onLogout: () => void;
   onOpenPrescriptionUpload?: () => void;
+  initialPanel?: ProfilePanel;
+  onInitialPanelHandled?: () => void;
   addresses?: CustomerAddress[];
   onAddressesChange?: Dispatch<SetStateAction<CustomerAddress[]>>;
 };
@@ -110,7 +106,6 @@ type ProfilePanel =
   | 'addressForm'
   | 'familyProfiles'
   | 'prescriptionVault'
-  | 'medicineReminders'
   | 'paymentsRefunds'
   | 'supportTickets'
   | 'notifications'
@@ -171,13 +166,6 @@ const profileActions: ProfileAction[] = [
     panel: 'prescriptionVault',
   },
   {
-    title: 'Medicine reminders',
-    subtitle: 'Refill and dose reminders',
-    Icon: Calendar,
-    tone: 'warning',
-    panel: 'medicineReminders',
-  },
-  {
     title: 'Payments and refunds',
     subtitle: 'Wallet, cards, invoices, and refunds',
     Icon: WalletCards,
@@ -191,7 +179,7 @@ const profileActions: ProfileAction[] = [
   },
   {
     title: 'Notifications',
-    subtitle: 'Order, offer, and reminder alerts',
+    subtitle: 'Order, offer, and account alerts',
     Icon: Bell,
     panel: 'notifications',
   },
@@ -208,16 +196,18 @@ export function ProfileScreen({
   onSessionChange,
   onLogout,
   onOpenPrescriptionUpload,
+  initialPanel,
+  onInitialPanelHandled,
   addresses: sharedAddresses,
   onAddressesChange,
 }: ProfileScreenProps) {
-  const [panel, setPanel] = useState<ProfilePanel>('overview');
+  const insets = useSafeAreaInsets();
+  const [panel, setPanel] = useState<ProfilePanel>(initialPanel || 'overview');
   const [profileDraft, setProfileDraft] = useState(() => createInitialProfileDraft(session));
   const [localAddresses, setLocalAddresses] = useState<CustomerAddress[]>(() => [
     createFallbackAddress(session),
   ]);
   const [familyProfiles, setFamilyProfiles] = useState<CustomerFamilyProfile[]>([]);
-  const [medicineReminders, setMedicineReminders] = useState<MedicineReminder[]>([]);
   const [prescriptions, setPrescriptions] = useState<PrescriptionRecord[]>([]);
   const [paymentSummary, setPaymentSummary] = useState<CustomerPaymentSummary>({
     payments: [],
@@ -250,6 +240,15 @@ export function ProfileScreen({
   );
 
   useEffect(() => {
+    if (!initialPanel) {
+      return;
+    }
+
+    setPanel(initialPanel);
+    onInitialPanelHandled?.();
+  }, [initialPanel, onInitialPanelHandled]);
+
+  useEffect(() => {
     let mounted = true;
 
     async function loadCustomerDetails() {
@@ -259,7 +258,6 @@ export function ProfileScreen({
         profileResult,
         addressesResult,
         familyProfilesResult,
-        remindersResult,
         prescriptionsResult,
         paymentsResult,
         supportResult,
@@ -269,7 +267,6 @@ export function ProfileScreen({
         getCustomerProfile(session.user.id, session.tokens.accessToken),
         listCustomerAddresses(session.user.id, session.tokens.accessToken),
         listCustomerFamilyProfiles(session.user.id, session.tokens.accessToken),
-        listMedicineReminders(session.user.id, session.tokens.accessToken),
         listPrescriptions(session.user.id, session.tokens.accessToken),
         listCustomerPayments(session.user.id, session.tokens.accessToken),
         listSupportTickets(session.user.id, session.tokens.accessToken),
@@ -291,10 +288,6 @@ export function ProfileScreen({
 
       if (familyProfilesResult.status === 'fulfilled') {
         setFamilyProfiles(familyProfilesResult.value.data);
-      }
-
-      if (remindersResult.status === 'fulfilled') {
-        setMedicineReminders(remindersResult.value.data);
       }
 
       if (prescriptionsResult.status === 'fulfilled') {
@@ -536,43 +529,14 @@ export function ProfileScreen({
     }
   }
 
-  async function handleSaveMedicineReminder(
-    reminderId: string | null,
-    payload: UpsertMedicineReminderPayload,
-  ) {
-    setIsSavingFeature(true);
+  async function handleDeletePrescription(prescription: PrescriptionRecord) {
+    setPrescriptions((current) => current.filter((item) => item.id !== prescription.id));
 
     try {
-      const response = reminderId
-        ? await updateMedicineReminder(
-            session.user.id,
-            reminderId,
-            payload,
-            session.tokens.accessToken,
-          )
-        : await createMedicineReminder(session.user.id, payload, session.tokens.accessToken);
-
-      setMedicineReminders((current) =>
-        reminderId
-          ? current.map((reminder) => (reminder.id === reminderId ? response.data : reminder))
-          : [response.data, ...current],
-      );
+      await deletePrescription(prescription.id, session.tokens.accessToken);
     } catch (error) {
-      Alert.alert('Could not save reminder', getErrorMessage(error));
-      throw error;
-    } finally {
-      setIsSavingFeature(false);
-    }
-  }
-
-  async function handleDeleteMedicineReminder(reminder: MedicineReminder) {
-    setMedicineReminders((current) => current.filter((item) => item.id !== reminder.id));
-
-    try {
-      await deleteMedicineReminder(session.user.id, reminder.id, session.tokens.accessToken);
-    } catch (error) {
-      setMedicineReminders((current) => [reminder, ...current]);
-      Alert.alert('Could not delete reminder', getErrorMessage(error));
+      setPrescriptions((current) => [prescription, ...current]);
+      Alert.alert('Could not delete prescription', getErrorMessage(error));
     }
   }
 
@@ -706,19 +670,7 @@ export function ProfileScreen({
         prescriptions={prescriptions}
         onBack={() => setPanel('overview')}
         onUploadPrescription={onOpenPrescriptionUpload}
-      />
-    );
-  }
-
-  if (panel === 'medicineReminders') {
-    return (
-      <MedicineRemindersScreen
-        reminders={medicineReminders}
-        familyProfiles={familyProfiles}
-        onBack={() => setPanel('overview')}
-        onSave={handleSaveMedicineReminder}
-        onDelete={handleDeleteMedicineReminder}
-        isSaving={isSavingFeature}
+        onDeletePrescription={handleDeletePrescription}
       />
     );
   }
@@ -775,7 +727,7 @@ export function ProfileScreen({
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.content}
       >
-        <View style={styles.hero}>
+        <View style={[styles.hero, { paddingTop: 34 + insets.top }]}>
           <View style={styles.heroTop}>
             <View style={styles.avatar}>
               <Text style={styles.avatarText}>{initials}</Text>
@@ -1291,8 +1243,10 @@ function ScreenHeader({
   subtitle: string;
   onBack: () => void;
 }) {
+  const insets = useSafeAreaInsets();
+
   return (
-    <View style={styles.subHeader}>
+    <View style={[styles.subHeader, { paddingTop: 22 + insets.top }]}>
       <Pressable
         accessibilityRole="button"
         onPress={onBack}
@@ -1527,7 +1481,6 @@ function createDefaultPrivacySettings(userId: string): CustomerPrivacySettings {
     orderUpdatesEnabled: true,
     prescriptionUpdatesEnabled: true,
     supportUpdatesEnabled: true,
-    medicineRemindersEnabled: true,
     promotionalOffersEnabled: false,
     dataSharingConsent: false,
     gpsForAddressesEnabled: true,

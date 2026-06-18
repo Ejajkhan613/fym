@@ -1,11 +1,13 @@
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import {
+  ArrowLeft,
   ClipboardList,
   MapPin,
   PackageCheck,
   ReceiptText,
   Truck,
 } from 'lucide-react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/metrics';
 import type { LocalOrder } from '../../types/domain';
@@ -13,14 +15,15 @@ import type { LocalOrder } from '../../types/domain';
 type OrdersScreenProps = {
   orders: LocalOrder[];
   realtimeStatus?: 'connected' | 'disconnected' | 'fallback';
-  realtimeLabel?: string;
+  onBack: () => void;
 };
 
 export function OrdersScreen({
   orders,
   realtimeStatus = 'fallback',
-  realtimeLabel,
+  onBack,
 }: OrdersScreenProps) {
+  const insets = useSafeAreaInsets();
   const activeOrders = orders.filter(
     (order) => !isDelivered(order.status),
   ).length;
@@ -29,26 +32,27 @@ export function OrdersScreen({
 
   return (
     <View style={styles.screen}>
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: 24 + insets.top }]}>
+        <Pressable accessibilityRole="button" onPress={onBack} style={styles.backButton}>
+          <ArrowLeft color={colors.text} size={27} strokeWidth={2.4} />
+        </Pressable>
         <View style={styles.headerTop}>
-          <Text style={styles.title}>Orders</Text>
-          <View
-            style={[styles.livePill, { backgroundColor: liveTone.background }]}
-          >
-            <View
-              style={[styles.liveDot, { backgroundColor: liveTone.color }]}
-            />
-            <Text style={[styles.liveText, { color: liveTone.color }]}>
-              {liveTone.label}
-            </Text>
+          <View style={styles.headerCopy}>
+            <View style={styles.titleRow}>
+              <Text style={styles.title}>Orders</Text>
+              <View
+                style={[styles.livePill, { backgroundColor: liveTone.background }]}
+              >
+                <View
+                  style={[styles.liveDot, { backgroundColor: liveTone.color }]}
+                />
+                <Text style={[styles.liveText, { color: liveTone.color }]}>
+                  {liveTone.label}
+                </Text>
+              </View>
+            </View>
           </View>
         </View>
-        <Text style={styles.subtitle}>
-          Track matching, packing, delivery, and payments.
-        </Text>
-        {realtimeLabel ? (
-          <Text style={styles.liveMeta}>Latest: {realtimeLabel}</Text>
-        ) : null}
       </View>
 
       <ScrollView
@@ -297,8 +301,25 @@ const styles = StyleSheet.create({
     paddingBottom: 18,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+  },
+  backButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#F4F4F6',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   headerTop: {
+    flex: 1,
+  },
+  headerCopy: {
+    flex: 1,
+  },
+  titleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
@@ -308,13 +329,6 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontSize: 30,
     fontWeight: '900',
-  },
-  subtitle: {
-    marginTop: 3,
-    color: colors.muted,
-    fontSize: 15,
-    lineHeight: 21,
-    fontWeight: '700',
   },
   livePill: {
     borderRadius: 999,
@@ -332,12 +346,6 @@ const styles = StyleSheet.create({
   liveText: {
     fontSize: 12,
     fontWeight: '900',
-  },
-  liveMeta: {
-    marginTop: 8,
-    color: colors.mutedDark,
-    fontSize: 12,
-    fontWeight: '800',
   },
   content: {
     paddingHorizontal: spacing.screen,

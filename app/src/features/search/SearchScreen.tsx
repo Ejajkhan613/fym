@@ -1,18 +1,21 @@
 import { useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { Plus, Search } from 'lucide-react-native';
+import { ArrowLeft, Plus, Search } from 'lucide-react-native';
 import { AppTextInput } from '../../components/AppTextInput';
 import { searchMedicines } from '../../api/catalog';
 import { demoMedicines } from '../../data/demo';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/metrics';
 import type { Medicine } from '../../types/domain';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 type SearchScreenProps = {
   onAddToCart: (medicine: Medicine) => void;
+  onBack: () => void;
 };
 
-export function SearchScreen({ onAddToCart }: SearchScreenProps) {
+export function SearchScreen({ onAddToCart, onBack }: SearchScreenProps) {
+  const insets = useSafeAreaInsets();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<Medicine[]>(demoMedicines);
   const [loading, setLoading] = useState(false);
@@ -40,8 +43,13 @@ export function SearchScreen({ onAddToCart }: SearchScreenProps) {
 
   return (
     <View style={styles.screen}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Search Medicines</Text>
+      <View style={[styles.header, { paddingTop: 24 + insets.top }]}>
+        <View style={styles.titleRow}>
+          <Pressable accessibilityRole="button" onPress={onBack} style={styles.backButton}>
+            <ArrowLeft color={colors.text} size={27} strokeWidth={2.4} />
+          </Pressable>
+          <Text style={styles.title}>Search Medicines</Text>
+        </View>
         <AppTextInput
           Icon={Search}
           value={query}
@@ -108,7 +116,21 @@ const styles = StyleSheet.create({
     padding: spacing.screen,
     gap: 18,
   },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+  },
+  backButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#F4F4F6',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   title: {
+    flex: 1,
     color: colors.text,
     fontSize: 30,
     fontWeight: '900',

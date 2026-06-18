@@ -21,6 +21,13 @@ const uploadPrescriptionSchema = z
   })
   .strict();
 
+const uploadPrescriptionFileSchema = z
+  .object({
+    customerId: z.string().uuid(),
+    orderId: z.string().uuid().optional(),
+  })
+  .strict();
+
 const listPrescriptionsQuerySchema = z
   .object({
     customerId: z.string().uuid().optional(),
@@ -50,6 +57,12 @@ const updateOcrSchema = z
   })
   .strict();
 
+const linkPrescriptionOrderSchema = z
+  .object({
+    orderId: z.string().uuid(),
+  })
+  .strict();
+
 const reviewActorSchema = z
   .object({
     reviewedByUserId: z.string().uuid(),
@@ -73,8 +86,10 @@ module.exports = {
   prescriptionStatuses,
   uuidParamSchema,
   uploadPrescriptionSchema,
+  uploadPrescriptionFileSchema,
   listPrescriptionsQuerySchema,
   updateOcrSchema,
+  linkPrescriptionOrderSchema,
   reviewActorSchema,
   rejectPrescriptionSchema,
   flagPrescriptionSchema,

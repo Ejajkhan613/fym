@@ -1,5 +1,6 @@
 import { ScrollView, StyleSheet, Text, View, Pressable } from 'react-native';
 import {
+  ArrowLeft,
   MapPin,
   Minus,
   Pill,
@@ -14,6 +15,7 @@ import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/metrics';
 import type { CartEntry, CustomerAddress } from '../../types/domain';
 import { formatAddress } from '../../utils/addresses';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 type CartScreenProps = {
   items: CartEntry[];
@@ -23,6 +25,7 @@ type CartScreenProps = {
   onRemove: (itemId: string) => void;
   onCheckout: () => void;
   isCheckingOut: boolean;
+  onBack: () => void;
 };
 
 export function CartScreen({
@@ -33,23 +36,22 @@ export function CartScreen({
   onRemove,
   onCheckout,
   isCheckingOut,
+  onBack,
 }: CartScreenProps) {
+  const insets = useSafeAreaInsets();
   const subtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
   const deliveryFee = items.length > 0 ? 25 : 0;
   const platformFee = items.length > 0 ? 5 : 0;
   const total = subtotal + deliveryFee + platformFee;
-  const totalQuantity = items.reduce((sum, item) => sum + item.quantity, 0);
 
   return (
     <View style={styles.screen}>
-      <View style={styles.header}>
-        <View>
+      <View style={[styles.header, { paddingTop: 24 + insets.top }]}>
+        <Pressable accessibilityRole="button" onPress={onBack} style={styles.backButton}>
+          <ArrowLeft color={colors.text} size={27} strokeWidth={2.4} />
+        </Pressable>
+        <View style={styles.headerCopy}>
           <Text style={styles.title}>Cart</Text>
-          <Text style={styles.subtitle}>
-            {items.length > 0
-              ? `${totalQuantity} item${totalQuantity === 1 ? '' : 's'} ready for checkout`
-              : 'Review medicines before checkout'}
-          </Text>
         </View>
       </View>
 
@@ -209,17 +211,25 @@ const styles = StyleSheet.create({
     paddingBottom: 18,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+  },
+  backButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#F4F4F6',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerCopy: {
+    flex: 1,
   },
   title: {
     color: colors.text,
     fontSize: 30,
     fontWeight: '900',
-  },
-  subtitle: {
-    marginTop: 3,
-    color: colors.muted,
-    fontSize: 15,
-    fontWeight: '700',
   },
   content: {
     paddingHorizontal: spacing.screen,

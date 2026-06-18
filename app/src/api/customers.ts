@@ -6,11 +6,9 @@ import type {
   CustomerFamilyProfile,
   CustomerProfile,
   CustomerPrivacySettings,
-  MedicineReminder,
   UpdateCustomerAddressPayload,
   UpdatePrivacySettingsPayload,
   UpsertCustomerFamilyProfilePayload,
-  UpsertMedicineReminderPayload,
   UpsertCustomerProfilePayload,
 } from '../types/domain';
 
@@ -132,55 +130,6 @@ export function deleteCustomerFamilyProfile(
   accessToken?: string,
 ) {
   return apiRequest<null>(`/customers/${userId}/family-profiles/${familyProfileId}`, {
-    method: 'DELETE',
-    accessToken,
-  });
-}
-
-export function listMedicineReminders(userId: string, accessToken?: string) {
-  return apiRequest<ApiEnvelope<MedicineReminder[]>>(
-    `/customers/${userId}/medicine-reminders`,
-    { accessToken },
-  );
-}
-
-export function createMedicineReminder(
-  userId: string,
-  payload: UpsertMedicineReminderPayload,
-  accessToken?: string,
-) {
-  return apiRequest<ApiEnvelope<MedicineReminder>>(
-    `/customers/${userId}/medicine-reminders`,
-    {
-      method: 'POST',
-      body: JSON.stringify(payload),
-      accessToken,
-    },
-  );
-}
-
-export function updateMedicineReminder(
-  userId: string,
-  reminderId: string,
-  payload: Partial<UpsertMedicineReminderPayload>,
-  accessToken?: string,
-) {
-  return apiRequest<ApiEnvelope<MedicineReminder>>(
-    `/customers/${userId}/medicine-reminders/${reminderId}`,
-    {
-      method: 'PATCH',
-      body: JSON.stringify(payload),
-      accessToken,
-    },
-  );
-}
-
-export function deleteMedicineReminder(
-  userId: string,
-  reminderId: string,
-  accessToken?: string,
-) {
-  return apiRequest<null>(`/customers/${userId}/medicine-reminders/${reminderId}`, {
     method: 'DELETE',
     accessToken,
   });

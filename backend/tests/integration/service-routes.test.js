@@ -404,6 +404,7 @@ describe("service route smoke tests", () => {
           id: prescriptionId,
           ...payload,
         })),
+        delete: jest.fn(async (prescriptionId) => ({ id: prescriptionId })),
         markUnderReview: jest.fn(async (prescriptionId) => ({
           id: prescriptionId,
         })),
@@ -416,6 +417,7 @@ describe("service route smoke tests", () => {
       .post("/prescriptions/upload")
       .send({ customerId: id, fileUrl: "https://cdn.example.test/rx.jpg" })
       .expect(201);
+    await request(prescriptionApp).delete(`/prescriptions/${id}`).expect(204);
   });
 
   test("order, cart, matching, payment, and delivery routes validate and delegate", async () => {

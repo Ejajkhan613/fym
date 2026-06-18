@@ -1,12 +1,16 @@
 const express = require("express");
 const createError = require("http-errors");
+const multer = require("multer");
 const { ZodError } = require("zod");
 const { PrescriptionService } = require("./prescription.service");
+const { DEFAULT_MAX_FILE_SIZE_BYTES } = require("./prescription.storage");
 const {
   uuidParamSchema,
+  uploadPrescriptionFileSchema,
   uploadPrescriptionSchema,
   listPrescriptionsQuerySchema,
   updateOcrSchema,
+  linkPrescriptionOrderSchema,
   reviewActorSchema,
   rejectPrescriptionSchema,
   flagPrescriptionSchema,
@@ -30,6 +34,49 @@ function asyncHandler(handler) {
   };
 }
 
+const allowedUploadMimeTypes = new Set([
+  "application/pdf",
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+]);
+
+const uploadFileMiddleware = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: Number(
+      process.env.PRESCRIPTION_UPLOAD_MAX_BYTES || DEFAULT_MAX_FILE_SIZE_BYTES,
+    ),
+    files: 1,
+  },
+  fileFilter(req, file, callback) {
+    if (!allowedUploadMimeTypes.has(file.mimetype)) {
+      return callback(
+        createError(400, "Only PDF, JPG, PNG, or WEBP prescriptions are allowed"),
+      );
+    }
+
+    return callback(null, true);
+  },
+}).single("file");
+
+function uploadFile(req, res, next) {
+  uploadFileMiddleware(req, res, (error) => {
+    if (!error) return next();
+
+    if (error instanceof multer.MulterError) {
+      const statusCode = error.code === "LIMIT_FILE_SIZE" ? 413 : 400;
+      return next(createError(statusCode, error.message));
+    }
+
+    return next(error);
+  });
+}
+
+function getFileType(file) {
+  return file?.mimetype === "application/pdf" ? "pdf" : "image";
+}
+
 function createPrescriptionRoutes({
   prescriptionService = new PrescriptionService(),
 } = {}) {
@@ -40,6 +87,25 @@ function createPrescriptionRoutes({
     asyncHandler(async (req, res) => {
       const payload = parse(uploadPrescriptionSchema, req.body);
       const prescription = await prescriptionService.upload(payload);
+      res.status(201).json({ data: prescription });
+    }),
+  );
+
+  router.post(
+    "/upload-file",
+    uploadFile,
+    asyncHandler(async (req, res) => {
+      const payload = parse(uploadPrescriptionFileSchema, req.body);
+
+      if (!req.file) {
+        throw createError(400, "Prescription file is required");
+      }
+
+      const prescription = await prescriptionService.uploadFile({
+        ...payload,
+        file: req.file,
+        fileType: getFileType(req.file),
+      });
       res.status(201).json({ data: prescription });
     }),
   );
@@ -76,6 +142,25 @@ function createPrescriptionRoutes({
       const payload = parse(updateOcrSchema, req.body);
       const prescription = await prescriptionService.updateOcr(id, payload);
       res.json({ data: prescription });
+    }),
+  );
+
+  router.patch(
+    "/:id/order",
+    asyncHandler(async (req, res) => {
+      const { id } = parse(uuidParamSchema, req.params);
+      const payload = parse(linkPrescriptionOrderSchema, req.body);
+      const prescription = await prescriptionService.linkToOrder(id, payload);
+      res.json({ data: prescription });
+    }),
+  );
+
+  router.delete(
+    "/:id",
+    asyncHandler(async (req, res) => {
+      const { id } = parse(uuidParamSchema, req.params);
+      await prescriptionService.delete(id);
+      res.status(204).send();
     }),
   );
 

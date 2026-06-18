@@ -39,7 +39,7 @@ class MatchingService {
       : await this.selectCandidates(input);
 
     if (candidates.length === 0) {
-      throw createError(409, "No approved pharmacy candidates are available");
+      throw createError(409, "No Pharmacy is taking orders right now");
     }
 
     try {

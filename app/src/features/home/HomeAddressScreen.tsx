@@ -18,6 +18,8 @@ import {
   Plus,
   ShieldCheck,
 } from 'lucide-react-native';
+import { StatusBar } from 'expo-status-bar';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppButton } from '../../components/AppButton';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/metrics';
@@ -56,6 +58,7 @@ export function HomeAddressScreen({
   onCreateAddress,
   isSaving,
 }: HomeAddressScreenProps) {
+  const insets = useSafeAreaInsets();
   const [mode, setMode] = useState<'list' | 'form'>('list');
   const [draft, setDraft] = useState<AddressDraft>(() => createDraft(session));
 
@@ -93,7 +96,8 @@ export function HomeAddressScreen({
       style={styles.screen}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <View style={styles.header}>
+      <StatusBar style="dark" />
+      <View style={[styles.header, { paddingTop: 22 + insets.top }]}>
         <Pressable accessibilityRole="button" onPress={onBack} style={styles.backButton}>
           <ArrowLeft color={colors.text} size={26} strokeWidth={2.4} />
         </Pressable>

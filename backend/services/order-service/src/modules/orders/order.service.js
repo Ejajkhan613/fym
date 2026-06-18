@@ -57,7 +57,7 @@ class OrderService {
     if (candidatePharmacyIds.length === 0) {
       throw createError(
         409,
-        "No approved pharmacies are available for this order",
+        "No pharmacies are available right now",
       );
     }
 

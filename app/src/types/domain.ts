@@ -148,34 +148,6 @@ export type CreateCustomerAddressPayload = {
 
 export type UpdateCustomerAddressPayload = Partial<CreateCustomerAddressPayload>;
 
-export type MedicineReminder = {
-  id: string;
-  userId: string;
-  familyProfileId?: string | null;
-  medicineName: string;
-  dosage?: string | null;
-  frequency: string;
-  scheduleTime: string;
-  startDate: string;
-  endDate?: string | null;
-  notes?: string | null;
-  isActive: boolean;
-  createdAt?: string;
-  updatedAt?: string;
-};
-
-export type UpsertMedicineReminderPayload = {
-  familyProfileId?: string;
-  medicineName: string;
-  dosage?: string;
-  frequency: string;
-  scheduleTime: string;
-  startDate: string;
-  endDate?: string;
-  notes?: string;
-  isActive?: boolean;
-};
-
 export type CustomerPrivacySettings = {
   userId: string;
   pushNotificationsEnabled: boolean;
@@ -183,7 +155,6 @@ export type CustomerPrivacySettings = {
   orderUpdatesEnabled: boolean;
   prescriptionUpdatesEnabled: boolean;
   supportUpdatesEnabled: boolean;
-  medicineRemindersEnabled: boolean;
   promotionalOffersEnabled: boolean;
   dataSharingConsent: boolean;
   gpsForAddressesEnabled: boolean;

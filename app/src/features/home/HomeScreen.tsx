@@ -17,6 +17,7 @@ import { spacing } from '../../theme/metrics';
 import type { AuthSession, CartEntry, CustomerAddress } from '../../types/domain';
 import { quickReorders } from '../../data/demo';
 import { formatAddress, formatShortAddress } from '../../utils/addresses';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 type HomeScreenProps = {
   session: AuthSession;
@@ -24,6 +25,7 @@ type HomeScreenProps = {
   onChangeAddress: () => void;
   onOpenPrescription: () => void;
   onOpenSearch: () => void;
+  onOpenNotifications: () => void;
   onAddToCart: (item: CartEntry) => void;
 };
 
@@ -33,8 +35,11 @@ export function HomeScreen({
   onChangeAddress,
   onOpenPrescription,
   onOpenSearch,
+  onOpenNotifications,
   onAddToCart,
 }: HomeScreenProps) {
+  const insets = useSafeAreaInsets();
+  const heroPaddingTop = 38 + insets.top;
   const firstName = session.user.name?.split(' ')[0] || 'Customer';
   const greeting = getGreeting();
   const addressTitle = deliveryAddress ? formatShortAddress(deliveryAddress) : 'Choose delivery address';
@@ -48,17 +53,22 @@ export function HomeScreen({
       contentContainerStyle={styles.scrollContent}
       showsVerticalScrollIndicator={false}
     >
-      <View style={styles.hero}>
+      <View style={[styles.hero, { paddingTop: heroPaddingTop }]}>
         <View style={styles.heroTop}>
           <View style={styles.heroCopy}>
             <Text style={styles.eyebrow}>{greeting.label.toUpperCase()}</Text>
             <Text style={styles.greeting}>Hi, {firstName}</Text>
             <Text style={styles.heroSubtext}>{greeting.message}</Text>
           </View>
-          <View style={styles.bellWrap}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Open notifications"
+            onPress={onOpenNotifications}
+            style={styles.bellWrap}
+          >
             <Bell color="#FFFFFF" size={28} strokeWidth={2.2} />
             <View style={styles.notificationDot} />
-          </View>
+          </Pressable>
         </View>
 
         <Pressable
@@ -182,17 +192,21 @@ function ActionCard({
       style={[styles.actionCard, isPrimary ? styles.primaryActionCard : styles.lightActionCard]}
     >
       <View style={[styles.actionIcon, isPrimary ? styles.actionIconPrimary : styles.actionIconLight]}>
-        <Icon color={isPrimary ? '#FFFFFF' : colors.primary} size={27} strokeWidth={2.4} />
+        <Icon color={isPrimary ? '#FFFFFF' : colors.primary} size={28} strokeWidth={2.4} />
       </View>
-      <Text style={[styles.actionTitle, isPrimary ? styles.actionTitlePrimary : null]}>{title}</Text>
-      <Text style={[styles.actionBody, isPrimary ? styles.actionBodyPrimary : null]}>{body}</Text>
-      <View style={styles.actionCtaRow}>
-        <Text style={[styles.actionCta, isPrimary ? styles.actionCtaPrimary : null]}>{cta}</Text>
-        <ArrowRight
-          color={isPrimary ? '#FFFFFF' : colors.primary}
-          size={17}
-          strokeWidth={2.5}
-        />
+      <View style={styles.actionCopy}>
+        <Text style={[styles.actionTitle, isPrimary ? styles.actionTitlePrimary : null]}>
+          {title}
+        </Text>
+        <Text style={[styles.actionBody, isPrimary ? styles.actionBodyPrimary : null]}>{body}</Text>
+        <View style={[styles.actionCtaPill, isPrimary ? styles.actionCtaPillPrimary : null]}>
+          <Text style={[styles.actionCta, isPrimary ? styles.actionCtaPrimary : null]}>{cta}</Text>
+          <ArrowRight
+            color={isPrimary ? colors.primaryDark : colors.primary}
+            size={16}
+            strokeWidth={2.6}
+          />
+        </View>
       </View>
     </Pressable>
   );
@@ -363,15 +377,16 @@ const styles = StyleSheet.create({
     gap: 22,
   },
   actionGrid: {
-    flexDirection: 'row',
-    gap: 14,
+    gap: 12,
   },
   actionCard: {
-    flex: 1,
-    minHeight: 206,
+    minHeight: 126,
     borderRadius: 20,
-    padding: 16,
+    padding: 15,
     borderWidth: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
     shadowColor: colors.shadow,
     shadowOpacity: 0.08,
     shadowRadius: 8,
@@ -387,12 +402,11 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
   },
   actionIcon: {
-    width: 54,
-    height: 54,
-    borderRadius: 17,
+    width: 58,
+    height: 58,
+    borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 18,
   },
   actionIconPrimary: {
     backgroundColor: 'rgba(255,255,255,0.17)',
@@ -400,30 +414,42 @@ const styles = StyleSheet.create({
   actionIconLight: {
     backgroundColor: colors.primarySoft,
   },
+  actionCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
   actionTitle: {
     color: colors.text,
-    fontSize: 18,
-    lineHeight: 23,
+    fontSize: 19,
+    lineHeight: 24,
     fontWeight: '900',
   },
   actionTitlePrimary: {
     color: '#FFFFFF',
   },
   actionBody: {
-    marginTop: 8,
+    marginTop: 6,
     color: colors.muted,
-    fontSize: 13,
-    lineHeight: 19,
+    fontSize: 14,
+    lineHeight: 20,
     fontWeight: '700',
   },
   actionBodyPrimary: {
     color: '#D9E8FF',
   },
-  actionCtaRow: {
-    marginTop: 'auto',
+  actionCtaPill: {
+    alignSelf: 'flex-start',
+    marginTop: 12,
+    minHeight: 34,
+    borderRadius: 999,
+    backgroundColor: colors.primarySoft,
+    paddingHorizontal: 12,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
+    gap: 6,
+  },
+  actionCtaPillPrimary: {
+    backgroundColor: '#FFFFFF',
   },
   actionCta: {
     color: colors.primary,
@@ -431,7 +457,7 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
   actionCtaPrimary: {
-    color: '#FFFFFF',
+    color: colors.primaryDark,
   },
   promiseRow: {
     flexDirection: 'row',

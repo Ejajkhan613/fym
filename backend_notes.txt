@@ -1,3 +1,5 @@
+docker compose -f backend/infra/docker/docker-compose.yml up -d --build
+
 Backend Docker build and run notes
 
 Prerequisites:

@@ -28,7 +28,26 @@ function buildForwardHeaders(req) {
   return headers;
 }
 
-function buildRequestBody(req) {
+async function readRequestBody(req) {
+  const chunks = [];
+  let totalBytes = 0;
+  const maxBytes = Number(process.env.GATEWAY_PROXY_MAX_BODY_BYTES || 25 * 1024 * 1024);
+
+  for await (const chunk of req) {
+    const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+    totalBytes += buffer.length;
+
+    if (totalBytes > maxBytes) {
+      throw createError(413, "Request body is too large");
+    }
+
+    chunks.push(buffer);
+  }
+
+  return Buffer.concat(chunks);
+}
+
+async function buildRequestBody(req) {
   if (["GET", "HEAD"].includes(req.method)) return undefined;
 
   if (req.body === undefined || req.body === null) return undefined;
@@ -52,8 +71,13 @@ function createProxyMiddleware(targetUrl) {
   return async (req, res, next) => {
     try {
       const upstreamUrl = new URL(req.originalUrl, targetUrl);
-      const body = buildRequestBody(req);
+      let body = await buildRequestBody(req);
       const headers = buildForwardHeaders(req);
+
+      if (body === undefined && !["GET", "HEAD"].includes(req.method)) {
+        const rawBody = await readRequestBody(req);
+        body = rawBody.length > 0 ? rawBody : undefined;
+      }
 
       if (body !== undefined && !headers["content-type"]) {
         headers["content-type"] = "application/json";

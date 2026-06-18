@@ -37,6 +37,7 @@ export function createOrder(payload: {
   customerId: string;
   items: CartEntry[];
   deliveryAddress: CustomerAddress;
+  prescriptionId?: string;
   accessToken?: string;
 }) {
   return apiRequest<ApiEnvelope<CreateOrderResponse>>('/orders', {
@@ -48,6 +49,7 @@ export function createOrder(payload: {
       deliveryFee: 25,
       platformFee: 5,
       discount: 0,
+      ...(payload.prescriptionId ? { prescriptionId: payload.prescriptionId } : {}),
       deliveryAddress: toDeliveryAddress(payload.deliveryAddress),
       items: payload.items.map((item) => ({
         medicineId: item.medicineId,

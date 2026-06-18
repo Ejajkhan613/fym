@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   Pressable,
-  SafeAreaView,
   StyleSheet,
   Text,
   View,
@@ -54,6 +53,7 @@ import {
 } from '../utils/addresses';
 
 type TabKey = 'home' | 'search' | 'cart' | 'orders' | 'profile';
+type ProfileStartPanel = 'notifications';
 
 type MainShellProps = {
   session: AuthSession;
@@ -80,6 +80,7 @@ export function MainShell({
 }: MainShellProps) {
   const insets = useSafeAreaInsets();
   const [activeTab, setActiveTab] = useState<TabKey>('home');
+  const [profileStartPanel, setProfileStartPanel] = useState<ProfileStartPanel>();
   const [showPrescriptionUpload, setShowPrescriptionUpload] = useState(false);
   const [showAddressSelector, setShowAddressSelector] = useState(false);
   const [cartItems, setCartItems] = useState<CartEntry[]>([]);
@@ -92,7 +93,6 @@ export function MainShell({
   const [orderLiveStatus, setOrderLiveStatus] = useState<
     'connected' | 'disconnected' | 'fallback'
   >('fallback');
-  const [orderLiveUpdate, setOrderLiveUpdate] = useState<string | undefined>();
 
   const defaultAddress = useMemo(
     () => addresses.find((address) => address.isDefault) || addresses[0],
@@ -161,10 +161,6 @@ export function MainShell({
         }
 
         setOrders(response.data.map((order) => mapApiOrderToLocalOrder(order)));
-
-        if (event) {
-          setOrderLiveUpdate(formatRealtimeEventLabel(event));
-        }
 
         return true;
       } catch {
@@ -495,11 +491,27 @@ export function MainShell({
     }
   }
 
+  function handleOpenNotifications() {
+    setShowPrescriptionUpload(false);
+    setShowAddressSelector(false);
+    setProfileStartPanel('notifications');
+    setActiveTab('profile');
+  }
+
   if (showPrescriptionUpload) {
     return (
       <PrescriptionUploadScreen
         session={session}
+        deliveryAddress={defaultAddress}
         onBack={() => setShowPrescriptionUpload(false)}
+        onOrderCreated={(orderResponse, fallbackItems) => {
+          setOrders((current) => [
+            mapApiOrderToLocalOrder(orderResponse.order, fallbackItems),
+            ...current,
+          ]);
+          setShowPrescriptionUpload(false);
+          setActiveTab('orders');
+        }}
       />
     );
   }
@@ -518,7 +530,7 @@ export function MainShell({
   }
 
   return (
-    <SafeAreaView style={styles.shell}>
+    <View style={styles.shell}>
       <StatusBar style={activeTab === 'home' ? 'light' : 'dark'} />
       <View style={styles.content}>
         {activeTab === 'home' ? (
@@ -528,11 +540,15 @@ export function MainShell({
             onChangeAddress={() => setShowAddressSelector(true)}
             onOpenPrescription={() => setShowPrescriptionUpload(true)}
             onOpenSearch={() => setActiveTab('search')}
+            onOpenNotifications={handleOpenNotifications}
             onAddToCart={handleAddToCart}
           />
         ) : null}
         {activeTab === 'search' ? (
-          <SearchScreen onAddToCart={handleAddToCart} />
+          <SearchScreen
+            onAddToCart={handleAddToCart}
+            onBack={() => setActiveTab('home')}
+          />
         ) : null}
         {activeTab === 'cart' ? (
           <CartScreen
@@ -543,13 +559,14 @@ export function MainShell({
             onRemove={handleRemoveFromCart}
             onCheckout={handleCheckout}
             isCheckingOut={isCheckingOut}
+            onBack={() => setActiveTab('home')}
           />
         ) : null}
         {activeTab === 'orders' ? (
           <OrdersScreen
             orders={orders}
             realtimeStatus={orderLiveStatus}
-            realtimeLabel={orderLiveUpdate}
+            onBack={() => setActiveTab('home')}
           />
         ) : null}
         {activeTab === 'profile' ? (
@@ -558,6 +575,8 @@ export function MainShell({
             onSessionChange={onSessionChange}
             onLogout={onLogout}
             onOpenPrescriptionUpload={() => setShowPrescriptionUpload(true)}
+            initialPanel={profileStartPanel}
+            onInitialPanelHandled={() => setProfileStartPanel(undefined)}
             addresses={addresses}
             onAddressesChange={setAddresses}
           />
@@ -603,7 +622,7 @@ export function MainShell({
           );
         })}
       </View>
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -708,15 +727,6 @@ function formatOrderDate(value: string) {
     hour: 'numeric',
     minute: '2-digit',
   });
-}
-
-function formatRealtimeEventLabel(event: OrderRealtimeEvent) {
-  const eventName = event.eventName.replace(/([a-z])([A-Z])/g, '$1 $2');
-  const createdAt = event.createdAt
-    ? formatOrderDate(event.createdAt)
-    : 'just now';
-
-  return `${eventName} - ${createdAt}`;
 }
 
 function isUuid(value: string) {

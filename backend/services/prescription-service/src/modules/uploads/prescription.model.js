@@ -150,6 +150,34 @@ class PrescriptionModel {
     return mapPrescriptionRow(result.rows[0]);
   }
 
+  async linkToOrder(id, orderId) {
+    const result = await this.pool.query(
+      `
+        UPDATE prescriptions
+        SET order_id = $2,
+            updated_at = now()
+        WHERE id = $1
+        RETURNING ${PRESCRIPTION_COLUMNS}
+      `,
+      [id, orderId],
+    );
+
+    return mapPrescriptionRow(result.rows[0]);
+  }
+
+  async deleteById(id) {
+    const result = await this.pool.query(
+      `
+        DELETE FROM prescriptions
+        WHERE id = $1
+        RETURNING ${PRESCRIPTION_COLUMNS}
+      `,
+      [id],
+    );
+
+    return mapPrescriptionRow(result.rows[0]);
+  }
+
   async updateStatus(id, input) {
     const result = await this.pool.query(
       `

@@ -1,5 +1,6 @@
 const createError = require("http-errors");
 const { PrescriptionModel } = require("./prescription.model");
+const { PrescriptionFileStorage } = require("./prescription.storage");
 
 function isForeignKeyViolation(error) {
   return error && error.code === "23503";
@@ -10,8 +11,12 @@ function isCheckViolation(error) {
 }
 
 class PrescriptionService {
-  constructor({ prescriptionModel = new PrescriptionModel() } = {}) {
+  constructor({
+    prescriptionModel = new PrescriptionModel(),
+    fileStorage = new PrescriptionFileStorage(),
+  } = {}) {
     this.prescriptionModel = prescriptionModel;
+    this.fileStorage = fileStorage;
   }
 
   async upload(input) {
@@ -21,6 +26,20 @@ class PrescriptionService {
       this.rethrowKnownDatabaseError(error);
       throw error;
     }
+  }
+
+  async uploadFile(input) {
+    const { fileUrl } = await this.fileStorage.uploadPrescriptionFile({
+      customerId: input.customerId,
+      file: input.file,
+    });
+
+    return this.upload({
+      customerId: input.customerId,
+      orderId: input.orderId,
+      fileUrl,
+      fileType: input.fileType,
+    });
   }
 
   async get(id) {
@@ -41,6 +60,36 @@ class PrescriptionService {
   async updateOcr(id, input) {
     const prescription = await this.prescriptionModel.updateOcr(id, input);
     if (!prescription) throw createError(404, "Prescription not found");
+    return prescription;
+  }
+
+  async linkToOrder(id, input) {
+    try {
+      const prescription = await this.prescriptionModel.linkToOrder(
+        id,
+        input.orderId,
+      );
+      if (!prescription) throw createError(404, "Prescription not found");
+      return prescription;
+    } catch (error) {
+      this.rethrowKnownDatabaseError(error);
+      throw error;
+    }
+  }
+
+  async delete(id) {
+    const prescription = await this.prescriptionModel.deleteById(id);
+    if (!prescription) throw createError(404, "Prescription not found");
+
+    try {
+      await this.fileStorage.deletePrescriptionFile({
+        fileUrl: prescription.fileUrl,
+      });
+    } catch {
+      // Deleting the vault record should still succeed if the storage object
+      // was already removed or belongs to a non-managed URL.
+    }
+
     return prescription;
   }
 

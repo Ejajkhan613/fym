@@ -1,5 +1,6 @@
 const { PrescriptionModel } = require("./prescription.model");
 const { PrescriptionService } = require("./prescription.service");
+const { PrescriptionFileStorage } = require("./prescription.storage");
 const {
   createPrescriptionRoutes,
   prescriptionRouteErrorHandler,
@@ -9,6 +10,7 @@ const validators = require("./prescription.validators");
 module.exports = {
   PrescriptionModel,
   PrescriptionService,
+  PrescriptionFileStorage,
   createPrescriptionRoutes,
   prescriptionRouteErrorHandler,
   validators,

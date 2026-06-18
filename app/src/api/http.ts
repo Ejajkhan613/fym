@@ -38,12 +38,13 @@ async function fetchWithTimeout(url: string, options: RequestInit) {
 export async function apiRequest<TResponse>(path: string, options: RequestOptions = {}) {
   const { accessToken, headers, body, ...requestOptions } = options;
   const requestHeaders = new Headers(headers);
+  const isFormDataBody = typeof FormData !== 'undefined' && body instanceof FormData;
 
   if (accessToken) {
     requestHeaders.set('Authorization', `Bearer ${accessToken}`);
   }
 
-  if (body && !requestHeaders.has('Content-Type')) {
+  if (body && !requestHeaders.has('Content-Type') && !isFormDataBody) {
     requestHeaders.set('Content-Type', 'application/json');
   }
 

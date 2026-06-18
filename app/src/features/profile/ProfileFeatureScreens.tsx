@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import type { ComponentType, ReactNode } from 'react';
 import {
   Alert,
@@ -16,10 +16,10 @@ import DateTimePicker, {
   type DateTimePickerEvent,
 } from '@react-native-community/datetimepicker';
 import * as DocumentPicker from 'expo-document-picker';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   ArrowLeft,
   Bell,
-  Calendar,
   Check,
   ClipboardList,
   FileText,
@@ -40,11 +40,9 @@ import type {
   CustomerNotification,
   CustomerPaymentSummary,
   CustomerPrivacySettings,
-  MedicineReminder,
   PrescriptionRecord,
   SupportTicket,
   UpsertCustomerFamilyProfilePayload,
-  UpsertMedicineReminderPayload,
   UpdatePrivacySettingsPayload,
 } from '../../types/domain';
 
@@ -61,18 +59,6 @@ type FamilyDraft = {
   relationship: string;
   dateOfBirth: string;
   gender: CustomerGender | '';
-};
-
-type ReminderDraft = {
-  familyProfileId: string;
-  medicineName: string;
-  dosage: string;
-  frequency: string;
-  scheduleTime: string;
-  startDate: string;
-  endDate: string;
-  notes: string;
-  isActive: boolean;
 };
 
 type TicketDraft = {
@@ -95,14 +81,6 @@ const genderOptions: Array<{ label: string; value: CustomerGender }> = [
   { label: 'Female', value: 'female' },
   { label: 'Other', value: 'other' },
   { label: 'Prefer not', value: 'prefer_not_to_say' },
-];
-
-const frequencyOptions: Array<{ label: string; value: string }> = [
-  { label: 'Once daily', value: 'Once daily' },
-  { label: 'Twice daily', value: 'Twice daily' },
-  { label: 'Thrice daily', value: 'Thrice daily' },
-  { label: 'Every 6 hours', value: 'Every 6 hours' },
-  { label: 'Weekly', value: 'Weekly' },
 ];
 
 export function FamilyProfilesScreen({
@@ -165,7 +143,7 @@ export function FamilyProfilesScreen({
   return (
     <FeatureShell
       title="Family Profiles"
-      subtitle="Manage prescriptions and reminders for family members."
+      subtitle="Manage prescriptions for family members."
       onBack={onBack}
     >
       <View style={styles.formSection}>
@@ -210,7 +188,7 @@ export function FamilyProfilesScreen({
       </View>
 
       {profiles.length === 0 ? (
-        <EmptyState icon={Users} title="No family profiles" body="Add a family member to reuse profile details in reminders and prescriptions." />
+        <EmptyState icon={Users} title="No family profiles" body="Add a family member to reuse profile details in prescriptions." />
       ) : (
         profiles.map((profile) => (
           <FeatureCard key={profile.id} icon={Users} title={profile.fullName}>
@@ -246,10 +224,12 @@ export function PrescriptionVaultScreen({
   prescriptions,
   onBack,
   onUploadPrescription,
+  onDeletePrescription,
 }: {
   prescriptions: PrescriptionRecord[];
   onBack: () => void;
   onUploadPrescription?: () => void;
+  onDeletePrescription: (prescription: PrescriptionRecord) => Promise<void>;
 }) {
   return (
     <FeatureShell
@@ -266,7 +246,7 @@ export function PrescriptionVaultScreen({
       ) : null}
 
       {prescriptions.length === 0 ? (
-        <EmptyState icon={FileText} title="No prescriptions yet" body="Uploaded prescriptions will appear here with OCR and review status." />
+        <EmptyState icon={FileText} title="No prescriptions yet" body="Uploaded prescriptions will appear here." />
       ) : (
         prescriptions.map((prescription) => (
           <FeatureCard
@@ -279,194 +259,23 @@ export function PrescriptionVaultScreen({
             {prescription.rejectionReason ? (
               <Text style={styles.cardText}>Reason: {prescription.rejectionReason}</Text>
             ) : null}
-          </FeatureCard>
-        ))
-      )}
-    </FeatureShell>
-  );
-}
-
-export function MedicineRemindersScreen({
-  reminders,
-  familyProfiles,
-  onBack,
-  onSave,
-  onDelete,
-  isSaving,
-}: {
-  reminders: MedicineReminder[];
-  familyProfiles: CustomerFamilyProfile[];
-  onBack: () => void;
-  onSave: (reminderId: string | null, payload: UpsertMedicineReminderPayload) => Promise<void>;
-  onDelete: (reminder: MedicineReminder) => Promise<void>;
-  isSaving: boolean;
-}) {
-  const [editing, setEditing] = useState<MedicineReminder | null>(null);
-  const [draft, setDraft] = useState<ReminderDraft>(() => createReminderDraft());
-  const profileNameById = useMemo(
-    () => new Map(familyProfiles.map((profile) => [profile.id, profile.fullName])),
-    [familyProfiles],
-  );
-
-  function resetForm() {
-    setEditing(null);
-    setDraft(createReminderDraft());
-  }
-
-  async function submit() {
-    if (!draft.medicineName.trim() || !draft.frequency.trim()) {
-      Alert.alert('Check reminder', 'Medicine name and frequency are required.');
-      return;
-    }
-
-    if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(draft.scheduleTime.trim())) {
-      Alert.alert('Check reminder', 'Reminder time must be in HH:mm format.');
-      return;
-    }
-
-    const startDate = parseDateInput(draft.startDate);
-    const endDate = draft.endDate.trim() ? parseDateInput(draft.endDate) : null;
-
-    if (!startDate) {
-      Alert.alert('Check reminder', 'Start date must be a valid date in YYYY-MM-DD format.');
-      return;
-    }
-
-    if (draft.endDate.trim() && !endDate) {
-      Alert.alert('Check reminder', 'End date must be a valid date in YYYY-MM-DD format.');
-      return;
-    }
-
-    if (endDate && endDate.getTime() < startDate.getTime()) {
-      Alert.alert('Check reminder', 'End date must be on or after start date.');
-      return;
-    }
-
-    try {
-      await onSave(editing?.id || null, {
-        ...(draft.familyProfileId ? { familyProfileId: draft.familyProfileId } : {}),
-        medicineName: draft.medicineName.trim(),
-        ...(draft.dosage.trim() ? { dosage: draft.dosage.trim() } : {}),
-        frequency: draft.frequency.trim(),
-        scheduleTime: draft.scheduleTime.trim(),
-        startDate: draft.startDate.trim(),
-        ...(draft.endDate.trim() ? { endDate: draft.endDate.trim() } : {}),
-        ...(draft.notes.trim() ? { notes: draft.notes.trim() } : {}),
-        isActive: draft.isActive,
-      });
-      resetForm();
-    } catch {
-      // Parent handler already displays the API error.
-    }
-  }
-
-  return (
-    <FeatureShell
-      title="Medicine Reminders"
-      subtitle="Dose and refill reminders for you and family profiles."
-      onBack={onBack}
-    >
-      <View style={styles.formSection}>
-        <Text style={styles.sectionTitle}>{editing ? 'Edit reminder' : 'Add reminder'}</Text>
-        <FormField
-          label="Medicine"
-          value={draft.medicineName}
-          onChangeText={(medicineName) => setDraft((current) => ({ ...current, medicineName }))}
-          placeholder="Medicine name"
-        />
-        <FormField
-          label="Dosage"
-          value={draft.dosage}
-          onChangeText={(dosage) => setDraft((current) => ({ ...current, dosage }))}
-          placeholder="E.g. 1 tablet"
-        />
-        <SegmentGroup
-          label="Frequency"
-          options={frequencyOptions}
-          value={draft.frequency}
-          onChange={(frequency) => setDraft((current) => ({ ...current, frequency }))}
-        />
-        <View style={styles.twoColumnRow}>
-          <View style={styles.column}>
-            <TimeField
-              label="Time"
-              value={draft.scheduleTime}
-              onChange={(scheduleTime) => setDraft((current) => ({ ...current, scheduleTime }))}
-            />
-          </View>
-          <View style={styles.column}>
-            <DateField
-              label="Start date"
-              value={draft.startDate}
-              onChange={(startDate) => setDraft((current) => ({ ...current, startDate }))}
-              placeholder="YYYY-MM-DD"
-            />
-          </View>
-        </View>
-        <DateField
-          label="End date"
-          value={draft.endDate}
-          onChange={(endDate) => setDraft((current) => ({ ...current, endDate }))}
-          placeholder="Optional"
-          minimumDate={parseDateInput(draft.startDate) || undefined}
-          optional
-        />
-        <FamilyPicker
-          profiles={familyProfiles}
-          value={draft.familyProfileId}
-          onChange={(familyProfileId) => setDraft((current) => ({ ...current, familyProfileId }))}
-        />
-        <FormField
-          label="Notes"
-          value={draft.notes}
-          onChangeText={(notes) => setDraft((current) => ({ ...current, notes }))}
-          placeholder="Optional note"
-          multiline
-        />
-        <ToggleRow
-          label="Reminder active"
-          description="Turn off without deleting the schedule."
-          value={draft.isActive}
-          onToggle={(isActive) => setDraft((current) => ({ ...current, isActive }))}
-        />
-        <View style={styles.buttonRow}>
-          {editing ? <AppButton label="Cancel" variant="secondary" onPress={resetForm} /> : null}
-          <AppButton label={editing ? 'Update' : 'Add'} loading={isSaving} onPress={submit} />
-        </View>
-      </View>
-
-      {reminders.length === 0 ? (
-        <EmptyState icon={Calendar} title="No medicine reminders" body="Add reminders for ongoing doses, refills, or family member schedules." />
-      ) : (
-        reminders.map((reminder) => (
-          <FeatureCard
-            key={reminder.id}
-            icon={Calendar}
-            title={reminder.medicineName}
-            badge={reminder.isActive ? 'Active' : 'Paused'}
-          >
-            <Text style={styles.cardText}>
-              {reminder.frequency} at {reminder.scheduleTime}
-            </Text>
-            <Text style={styles.cardText}>
-              For {reminder.familyProfileId ? profileNameById.get(reminder.familyProfileId) || 'Family member' : 'Me'}
-            </Text>
             <View style={styles.inlineActions}>
-              <SmallButton
-                label="Edit"
-                onPress={() => {
-                  setEditing(reminder);
-                  setDraft(createReminderDraft(reminder));
-                }}
-              />
               <SmallButton
                 label="Delete"
                 danger
                 onPress={() =>
-                  Alert.alert('Delete reminder?', reminder.medicineName, [
-                    { text: 'Cancel', style: 'cancel' },
-                    { text: 'Delete', style: 'destructive', onPress: () => onDelete(reminder) },
-                  ])
+                  Alert.alert(
+                    'Delete prescription?',
+                    'This will remove the prescription from your vault.',
+                    [
+                      { text: 'Cancel', style: 'cancel' },
+                      {
+                        text: 'Delete',
+                        style: 'destructive',
+                        onPress: () => onDeletePrescription(prescription),
+                      },
+                    ],
+                  )
                 }
               />
             </View>
@@ -682,7 +491,7 @@ export function NotificationsScreen({
   return (
     <FeatureShell
       title="Notifications"
-      subtitle="Order, prescription, support, and reminder alerts."
+      subtitle="Order, prescription, support, and account alerts."
       onBack={onBack}
     >
       <View style={styles.formSection}>
@@ -773,12 +582,6 @@ export function PrivacySecurityScreen({
           onToggle={(value) => onTogglePreference('supportUpdatesEnabled', value)}
         />
         <ToggleRow
-          label="Medicine reminders"
-          description="Allow dose and refill reminders."
-          value={settings.medicineRemindersEnabled}
-          onToggle={(value) => onTogglePreference('medicineRemindersEnabled', value)}
-        />
-        <ToggleRow
           label="GPS for addresses"
           description="Use device location to attach delivery coordinates."
           value={settings.gpsForAddressesEnabled}
@@ -820,12 +623,14 @@ function FeatureShell({
   onBack: () => void;
   children: ReactNode;
 }) {
+  const insets = useSafeAreaInsets();
+
   return (
     <KeyboardAvoidingView
       style={styles.screen}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: 22 + insets.top }]}>
         <Pressable accessibilityRole="button" onPress={onBack} style={styles.backButton}>
           <ArrowLeft color={colors.text} size={27} strokeWidth={2.4} />
         </Pressable>
@@ -929,74 +734,6 @@ function DateField({
   );
 }
 
-function TimeField({
-  label,
-  value,
-  onChange,
-}: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-}) {
-  const [showInlinePicker, setShowInlinePicker] = useState(false);
-  const selectedTime = parseTimeInput(value) || new Date(2000, 0, 1, 9, 0);
-
-  function handlePickerChange(event: DateTimePickerEvent, nextDate?: Date) {
-    if (Platform.OS !== 'ios') {
-      setShowInlinePicker(false);
-    }
-
-    if (event.type === 'dismissed' || !nextDate) {
-      return;
-    }
-
-    onChange(formatTimeInput(nextDate));
-  }
-
-  function openPicker() {
-    if (Platform.OS === 'android') {
-      DateTimePickerAndroid.open({
-        value: selectedTime,
-        mode: 'time',
-        display: 'clock',
-        is24Hour: true,
-        onChange: handlePickerChange,
-      });
-      return;
-    }
-
-    setShowInlinePicker((current) => !current);
-  }
-
-  return (
-    <View style={styles.fieldGroup}>
-      <Text style={styles.inputLabel}>{label}</Text>
-      <View style={styles.pickerInputWrap}>
-        <TextInput
-          value={value}
-          onChangeText={onChange}
-          placeholder="09:00"
-          placeholderTextColor="#8D8F97"
-          keyboardType="numbers-and-punctuation"
-          style={styles.pickerTextInput}
-        />
-        <Pressable accessibilityRole="button" onPress={openPicker} style={styles.pickerButton}>
-          <Text style={styles.pickerButtonText}>Pick</Text>
-        </Pressable>
-      </View>
-      {showInlinePicker ? (
-        <DateTimePicker
-          display="spinner"
-          mode="time"
-          value={selectedTime}
-          is24Hour
-          onChange={handlePickerChange}
-        />
-      ) : null}
-    </View>
-  );
-}
-
 function FormField({
   label,
   value,
@@ -1053,43 +790,6 @@ function SegmentGroup<TValue extends string>({
           >
             <Text style={[styles.segmentText, value === option.value ? styles.segmentTextActive : null]}>
               {option.label}
-            </Text>
-          </Pressable>
-        ))}
-      </View>
-    </View>
-  );
-}
-
-function FamilyPicker({
-  profiles,
-  value,
-  onChange,
-}: {
-  profiles: CustomerFamilyProfile[];
-  value: string;
-  onChange: (value: string) => void;
-}) {
-  return (
-    <View style={styles.fieldGroup}>
-      <Text style={styles.inputLabel}>For profile</Text>
-      <View style={styles.segmentRow}>
-        <Pressable
-          accessibilityRole="button"
-          onPress={() => onChange('')}
-          style={[styles.segment, value === '' ? styles.segmentActive : null]}
-        >
-          <Text style={[styles.segmentText, value === '' ? styles.segmentTextActive : null]}>Me</Text>
-        </Pressable>
-        {profiles.map((profile) => (
-          <Pressable
-            key={profile.id}
-            accessibilityRole="button"
-            onPress={() => onChange(profile.id)}
-            style={[styles.segment, value === profile.id ? styles.segmentActive : null]}
-          >
-            <Text style={[styles.segmentText, value === profile.id ? styles.segmentTextActive : null]}>
-              {profile.fullName}
             </Text>
           </Pressable>
         ))}
@@ -1210,20 +910,6 @@ function createFamilyDraft(profile?: CustomerFamilyProfile | null): FamilyDraft 
   };
 }
 
-function createReminderDraft(reminder?: MedicineReminder | null): ReminderDraft {
-  return {
-    familyProfileId: reminder?.familyProfileId || '',
-    medicineName: reminder?.medicineName || '',
-    dosage: reminder?.dosage || '',
-    frequency: reminder?.frequency || 'Daily',
-    scheduleTime: reminder?.scheduleTime?.slice(0, 5) || '09:00',
-    startDate: reminder?.startDate ? reminder.startDate.slice(0, 10) : formatDateInput(new Date()),
-    endDate: reminder?.endDate ? reminder.endDate.slice(0, 10) : '',
-    notes: reminder?.notes || '',
-    isActive: reminder?.isActive ?? true,
-  };
-}
-
 function parseDateInput(value: string) {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value.trim());
 
@@ -1252,23 +938,6 @@ function formatDateInput(date: Date) {
   const month = String(date.getMonth() + 1).padStart(2, '0');
   const day = String(date.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
-}
-
-function parseTimeInput(value: string) {
-  const match = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(value.trim());
-
-  if (!match) {
-    return null;
-  }
-
-  const date = new Date(2000, 0, 1, Number(match[1]), Number(match[2]));
-  return date;
-}
-
-function formatTimeInput(date: Date) {
-  const hours = String(date.getHours()).padStart(2, '0');
-  const minutes = String(date.getMinutes()).padStart(2, '0');
-  return `${hours}:${minutes}`;
 }
 
 function formatFileSize(size?: number) {
@@ -1425,13 +1094,6 @@ const styles = StyleSheet.create({
     color: colors.muted,
     fontSize: 13,
     fontWeight: '900',
-  },
-  twoColumnRow: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  column: {
-    flex: 1,
   },
   segmentRow: {
     flexDirection: 'row',
